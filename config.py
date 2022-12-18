@@ -5,7 +5,7 @@
 # @contact: 876720687@qq.com
 import pandas as pd
 
-data_dir = "/Users/yemeng/hyx/20221116FinalPoj/data/"
+data_dir = "/Users/yemeng/hyx/pythonProject1/data/"
 
 # location of folders
 data_in = data_dir + "raw/"
