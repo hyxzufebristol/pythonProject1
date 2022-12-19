@@ -40,11 +40,15 @@ print(y_pred)
 # 聚类结果
 cat_df_km=df.copy()
 cat_df_km['km_result']=y_pred
-
-
+cat_df_km.to_csv(data_out+"listing_cluster.csv")
 
 df['host_is_superhost'] = df['host_is_superhost'].map({'t':1,'f':0})
+
 
 reviews.drop(columns=['id'],inplace=True)
 reviews = reviews.rename(columns={'listing_id': 'id'})
 df_concat = pd.merge(df,reviews,how="inner",on='id')
+df_concat.to_csv(data_out+"df_concat.csv", index=False)
+
+
+

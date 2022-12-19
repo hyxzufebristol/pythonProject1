@@ -5,7 +5,7 @@
 # @contact: 876720687@qq.com
 
 
-
+# 处理缺失值
 import pandas as pd
 import folium
 from folium.plugins import FastMarkerCluster
@@ -15,7 +15,7 @@ from config import *
 
 
 # zero step
-data = pd.read_csv(data_in + "listings.csv", delimiter=",", dtype="unicode")
+df = pd.read_csv(data_in + "listings.csv", delimiter=",", dtype="unicode")
 
 # ----------------- map1 -------------
 # lats2018 = data['latitude'].tolist()
@@ -38,7 +38,7 @@ drops = [
     "host_thumbnail_url",
     "host_picture_url",
 ]
-df_listings_drop0 = data.drop(columns=drops)
+df_listings_drop0 = df.drop(columns=drops)
 msno.matrix(df_listings_drop0, labels=True)
 
 df_listings_drop1 = df_listings_drop0.dropna(subset=['reviews_per_month','review_scores_rating','review_scores_accuracy'])

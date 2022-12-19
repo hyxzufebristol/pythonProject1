@@ -3,6 +3,7 @@
 # @Author : YeMeng 
 # @File : demo1.py 
 # @contact: 876720687@qq.com
+import pandas as pd
 from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans
 
@@ -11,7 +12,11 @@ from config import *
 
 df = pd.read_csv(data_out + "df_clean.csv", delimiter=",")
 
+
+
+# TODO:visulization
 # ----------- 地图代码 ------------
+# 需要走墙，国内不出图
 # # zero step
 # data = pd.read_csv(data_out + "df_clean.csv", delimiter=",", dtype="unicode")
 #
@@ -89,3 +94,6 @@ plt.xlabel('Average review score', fontsize=14)
 
 plt.tight_layout()
 plt.show()
+
+
+
