@@ -10,9 +10,7 @@ from sklearn.cluster import KMeans
 from config import *
 
 
-df = pd.read_csv(data_out + "df_clean.csv", delimiter=",")
-
-
+df = pd.read_csv("./data/clean/df_clean.csv", delimiter=",")
 
 # TODO:visulization
 # ----------- 地图代码 ------------
@@ -27,6 +25,43 @@ df = pd.read_csv(data_out + "df_clean.csv", delimiter=",")
 #
 # map1 = folium.Map(location=[52.3680, 4.9036], zoom_start=11.5)
 # FastMarkerCluster(data=locations).add_to(map1)
+
+import pandas as pd
+from folium.plugins import FastMarkerCluster
+from haversine import haversine
+
+from config import reduce_mem_usage
+
+listings = pd.read_csv("./data/clean/df_concat.csv")
+listings = reduce_mem_usage(listings)
+# loc1 = s.loc[:, ["latitude", "longitude"]].values[0].tolist()
+
+# the place that we want to go.
+destination = [-37.82, 144.96]
+
+
+def cal_distance(la, lon):
+    loc2 = [la, lon]
+    return haversine(destination, loc2)
+
+
+listings['distance'] = listings[['latitude', "longitude"]].apply(
+    lambda x: cal_distance(x['latitude'], x['longitude'])
+    , axis=1)
+
+# draw maps
+lats = listings['latitude'].tolist()
+lons = listings['longitude'].tolist()
+locations = list(zip(lats, lons))
+import folium
+map1 = folium.Map(location=destination, zoom_start=11.5)
+folium.Circle(radius=5000,location=destination, color="blue", fill=False).add_to(map1)
+# FastMarkerCluster(data=locations).add_to(map1)
+df_loc = listings.loc[:["latitude","longitude"]].values.tolist()
+marker_cluster = FastMarkerCluster().add_to(map1)
+for loc in df_loc:
+    folium.Marker(location=loc,icon=None).add_to(marker_cluster)
+
 
 # ------------ 分析 ------------
 #

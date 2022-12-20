@@ -3,19 +3,27 @@
 # @Author : YeMeng 
 # @File : config.py 
 # @contact: 876720687@qq.com
+import os
+import sys
+from pathlib import Path
+import numpy as np
 import pandas as pd
 
-data_dir = "/Users/yemeng/hyx/pythonProject1/data/"
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[0]
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))  # add ROOT to PATH
+ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
+# data_dir = "/Users/yemeng/hyx/pythonProject1/data/"
+# data_dir = ROOT
 # location of folders
-data_in = data_dir + "raw/"
-data_out = data_dir + "clean/"
+# data_in = data_dir + "raw/"
+# data_out = data_dir + "clean/"
 
 # 运行更多行的代码
 pd.set_option('display.max_rows', 100)
 pd.set_option('display.max_columns', 100)
-
-import numpy as np
 
 
 def reduce_mem_usage(df):

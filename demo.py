@@ -15,7 +15,7 @@ from config import *
 
 
 # zero step
-df = pd.read_csv(data_in + "listings.csv", delimiter=",", dtype="unicode")
+df = pd.read_csv("./data/raw/listings.csv", delimiter=",", dtype="unicode")
 
 # ----------------- map1 -------------
 # lats2018 = data['latitude'].tolist()
@@ -64,7 +64,7 @@ df_listings_drop5['profit_per_month'] = df_listings_drop5['price_$'] * df_listin
 df_listings_drop5 = df_listings_drop5.sort_values(by=['profit_per_month'],ascending=False)
 
 
-df_listings_drop5.to_csv(data_out+"df_clean.csv", index=False)
+df_listings_drop5.to_csv("./data/clean/df_clean.csv", index=False)
 
 
 

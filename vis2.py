@@ -16,7 +16,7 @@ from config import *
 # 2. the most top 30 words in newreview data
 # the reviews are mainly from the 'comment' column.
 
-df = pd.read_csv(data_out+"df_concat.csv")
+df = pd.read_csv("./data/clean/df_concat.csv")
 reviews_details = df[['name', 'host_id', 'host_name', 'date', 'reviewer_id', 'reviewer_name', 'comments']]
 
 host_reviews = reviews_details.groupby(['host_id', 'host_name']).size().sort_values(ascending=False).to_frame(name = "number_of_reviews")
@@ -74,7 +74,7 @@ plt.show()
 
 # 3. Perimeter of number of listings per host.
 # 我们需要找到最终入围的host有哪几个人？这个可以说是爱彼迎的优质会员了
-df = pd.read_csv(data_out+"df_concat.csv")
+df = pd.read_csv("./data/clean/df_concat.csv")
 df = reduce_mem_usage(df)
 
 # host_names = df[['host_name']].drop_duplicates()
