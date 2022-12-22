@@ -36,6 +36,7 @@ listings = pd.read_csv("./data/clean/df_concat.csv")
 listings = reduce_mem_usage(listings)
 # loc1 = s.loc[:, ["latitude", "longitude"]].values[0].tolist()
 
+# ------------------ 地图 ---------------------
 # the place that we want to go.
 destination = [-37.82, 144.96]
 

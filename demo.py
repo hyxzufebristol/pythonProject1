@@ -12,18 +12,10 @@ from folium.plugins import FastMarkerCluster
 import missingno as msno
 from matplotlib import pyplot as plt
 from config import *
-
+from math import *
 
 # zero step
 df = pd.read_csv("./data/raw/listings.csv", delimiter=",", dtype="unicode")
-
-# ----------------- map1 -------------
-# lats2018 = data['latitude'].tolist()
-# lons2018 = data['longitude'].tolist()
-# locations = list(zip(lats2018, lons2018))
-#
-# map1 = folium.Map(location=[52.3680, 4.9036], zoom_start=11.5)
-# FastMarkerCluster(data=locations).add_to(map1)
 
 
 drops = [
@@ -64,8 +56,21 @@ df_listings_drop5['profit_per_month'] = df_listings_drop5['price_$'] * df_listin
 df_listings_drop5 = df_listings_drop5.sort_values(by=['profit_per_month'],ascending=False)
 
 
-df_listings_drop5.to_csv("./data/clean/df_clean.csv", index=False)
+# df_listings_drop5.to_csv("./data/clean/df_clean.csv", index=False)
 
 
 
+# 增加筛选方法当中需要要求distance在一定的距离限制范围值之内
+df['distance']=2*6371*(
+    (
+        ((df['latitude'] + 37.82) / 2).apply(sin)**2 +
+        (df['latitude']).apply(cos) * (df['latitude']).apply(cos) * (((df['longitude']-144.96)/2).apply(sin)**2)
+     ).apply(sqrt)
+).apply(asin)
 
+
+
+# 一些额外的处理方法
+# df['host_is_superhost'] = df['host_is_superhost'].map({'t':1,'f':0})
+
+# df['review_scores_avg6']=(df['review_scores_accuracy']+df['review_scores_cleanliness']+df['review_scores_checkin']+df['review_scores_communication']+df['review_scores_location']+df['review_scores_value'])/6

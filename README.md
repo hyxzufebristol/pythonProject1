@@ -8,6 +8,7 @@ https://www.kaggle.com/datasets/nadyafed/melbourne-airbnb-2020?select=reviews.cs
 code1
 basic analysis
 https://www.kaggle.com/code/erikbruin/airbnb-the-amsterdam-story-with-interactive-maps
+
 code2
 非常完整的内容，代码格式较为规范
 https://www.kaggle.com/code/zacksshen/kaggle-seattle-airbnb
