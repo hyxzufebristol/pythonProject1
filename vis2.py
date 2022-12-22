@@ -68,6 +68,9 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 tfidf_vectorizer = TfidfVectorizer(use_idf=True, max_features=20000)
 # just send in all your docs here
 tfidf_vectorizer_vectors = tfidf_vectorizer.fit_transform(texts)
+# X = tfidf_vectorizer_vectors.toarray()
+# Y = df['Sentiment'][:7000]
+
 
 vec = CountVectorizer().fit(texts)
 bag_of_words = vec.transform(texts)
