@@ -2,6 +2,10 @@
 
 
 
+# 注意NLTK需要手动下载下来并放到这个位置，有些文件需要解压缩，有些不需要。
+C:\Users\Administrator\nltk_data
+
+
 数据源
 https://www.kaggle.com/datasets/nadyafed/melbourne-airbnb-2020?select=reviews.csv
 

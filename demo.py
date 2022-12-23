@@ -13,10 +13,16 @@ import missingno as msno
 from matplotlib import pyplot as plt
 from config import *
 from math import *
+import missingno as msno
+import numpy as np
+import pandas as pd
 
 # zero step
-df = pd.read_csv("./data/raw/listings.csv", delimiter=",", dtype="unicode")
+df_listings = pd.read_csv('listings.csv')
+df_reviews = pd.read_csv('reviews.csv')
 
+# Missing value visualization
+# msno.matrix(df_listings, labels=True)
 
 drops = [
     "last_scraped",
@@ -29,48 +35,88 @@ drops = [
     "host_url",
     "host_thumbnail_url",
     "host_picture_url",
+    "has_availability"
 ]
-df_listings_drop0 = df.drop(columns=drops)
-msno.matrix(df_listings_drop0, labels=True)
+df_listings = df_listings.drop(columns=drops)
+# 热力图可视化
+msno.heatmap(df_listings)
+df_listings = df_listings.dropna(subset=['reviews_per_month',
+                                         'review_scores_rating',
+                                         'review_scores_accuracy',
+                                         'bathrooms_text',
+                                         'bedrooms',
+                                         'beds',
+                                         'description',
+                                         'neighborhood_overview',
+                                         'host_about',
+                                         'host_response_time',
+                                         'host_response_rate',
+                                         'host_location'
+                                         ])
+# delete the column containing only missing values
+df_listings = df_listings.dropna(axis=1, how='all')
 
-df_listings_drop1 = df_listings_drop0.dropna(subset=['reviews_per_month','review_scores_rating','review_scores_accuracy'])
-#delete the rows that contain missing values of amenities
-df_listings_drop2 = df_listings_drop1.dropna(subset=['bathrooms_text','bedrooms','beds'])
-#delete the column containing only missing values
-df_listings_drop3=df_listings_drop2.dropna(axis=1,how='all')
 
-df_listings_drop4 = df_listings_drop3.dropna(subset=['description','neighborhood_overview','host_about'])
+# msno.matrix(df_listings, labels=True)
 
-df_listings_drop5 = df_listings_drop4.dropna(subset=['host_response_time','host_response_rate'])
-
-# df_listings_drop5['price']
+## 处理具体indicators of price, profit
 # remove '$' of 'price'
 def format_price(price):
-    return(float(price.replace('$','').replace(',','')))
-
-df_listings_drop5['price_$'] = df_listings_drop5['price'].apply(format_price)
+    return (float(price.replace('$', '').replace(',', '')))
 
 
-# (homes' names of 100 highest profit_per_month)
-df_listings_drop5['profit_per_month'] = df_listings_drop5['price_$'] * df_listings_drop5['reviews_per_month'].astype("float")
-df_listings_drop5 = df_listings_drop5.sort_values(by=['profit_per_month'],ascending=False)
+df_listings['price_$'] = df_listings['price'].apply(format_price)
+df_listings[['price', 'price_$']].head()
 
+# (homes' names of 100 highest profit_per_month), profit_per_month = price_$ * reviews_per_month/review_scores_rating
+df_listings['profit_per_month'] = df_listings['price_$'] * df_listings['reviews_per_month'] / df_listings[
+    'review_scores_rating']
 
-# df_listings_drop5.to_csv("./data/clean/df_clean.csv", index=False)
+df_listings = df_listings.sort_values(by=['profit_per_month'], ascending=False)
 
+##处理 reviews相关变量
+# calculate average reviews_score
+df_listings['review_scores_avg6'] = (df_listings['review_scores_accuracy'] + df_listings['review_scores_cleanliness'] +
+                                     df_listings['review_scores_checkin'] + df_listings['review_scores_communication'] +
+                                     df_listings['review_scores_location'] + df_listings['review_scores_value']) / 6
 
+##处理host相关变量
+# replace 't' to '1', and 'f' to '0' in the columns of 'host_is_superhost','host_has_profile_pic','host_identity_verified','instant_bookable'
+
+# Convert 't', 'f' to 1, 0
+tf_cols = ['host_is_superhost',
+           'host_has_profile_pic',
+           'host_identity_verified',
+           'instant_bookable']
+for tf_col in tf_cols:
+    df_listings[tf_col] = df_listings[tf_col].map({'t': 1, 'f': 0})
+
+# as for the column of 'host_response_rate', Converts 'string' to 'int' format
+df_listings['host_response_rate'] = df_listings['host_response_rate'].str.strip('%').astype(float) / 100
+
+# Converts 'string' to 'int' format, classify 'host_response_time' into 4 levels
+df_listings['host_response_time'] = df_listings['host_response_time'].map({
+    'within an hour': 100,
+    'within a few hours': 75,
+    'within a day': 50,
+    'a few days or more': 25})
+
+## ------------------------------- 处理reviews -------------------------
+# delete comments missing value
+df_reviews = df_reviews[~df_reviews['comments'].isna()]
+
+# drop rows that 'listing_id' doesn't exist in the 'id' of 'listings' and create a new dataset'concat'
+# merge dataset 'listings' and 'reviews' with the same 'id'
+df_reviews.drop(columns=['id'], inplace=True)
+df_reviews = df_reviews.rename(columns={'listing_id': 'id'})
+df_concat = pd.merge(df_listings, df_reviews, how="inner", on='id')
+
+df_listings.to_csv("df_listings.csv")
 
 # 增加筛选方法当中需要要求distance在一定的距离限制范围值之内
-df['distance']=2*6371*(
-    (
-        ((df['latitude'] + 37.82) / 2).apply(sin)**2 +
-        (df['latitude']).apply(cos) * (df['latitude']).apply(cos) * (((df['longitude']-144.96)/2).apply(sin)**2)
-     ).apply(sqrt)
-).apply(asin)
-
-
-
-# 一些额外的处理方法
-# df['host_is_superhost'] = df['host_is_superhost'].map({'t':1,'f':0})
-
-# df['review_scores_avg6']=(df['review_scores_accuracy']+df['review_scores_cleanliness']+df['review_scores_checkin']+df['review_scores_communication']+df['review_scores_location']+df['review_scores_value'])/6
+# df['distance']=2*6371*(
+#     (
+#         ((df['latitude'] + 37.82) / 2).apply(sin)**2 +
+#         (df['latitude']).apply(cos) * (df['latitude']).apply(cos) * (((df['longitude']-144.96)/2).apply(sin)**2)
+#      ).apply(sqrt)
+# ).apply(asin)

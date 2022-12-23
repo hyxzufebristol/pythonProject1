@@ -42,9 +42,9 @@ reviews_details['comments'] = reviews_details['comments'].str.lower()
 # remove windows new line
 reviews_details['comments'] = reviews_details['comments'].str.replace('\r\n', "")
 # remove stopwords (from nltk library)
-# 加载停用词
-reviews_details['comments'] = reviews_details['comments'].apply(lambda x: " ".join([i for i in x.split()
-                                                                                    if i not in (stop_english)]))
+# # 加载停用词
+# reviews_details['comments'] = reviews_details['comments'].apply(lambda x: " ".join([i for i in x.split()
+#                                                                                     if i not in (stop_english)]))
 # remove punctuation
 reviews_details['comments'] = reviews_details['comments'].str.replace('[^\w\s]', " ")
 # replace x spaces by one space
@@ -63,37 +63,43 @@ print(reviews_details.comments.values[2])
 # find the most used words using the CountVectorizer() function of sklearn.
 texts = reviews_details.comments.tolist()
 
+# 文本向量化的提取方法
+# 提取方法1
+texts = texts[:1000]
 from sklearn.feature_extraction.text import TfidfVectorizer
 # settings that you use for count vectorizer will go here
 tfidf_vectorizer = TfidfVectorizer(use_idf=True, max_features=20000)
 # just send in all your docs here
 tfidf_vectorizer_vectors = tfidf_vectorizer.fit_transform(texts)
-# X = tfidf_vectorizer_vectors.toarray()
-# Y = df['Sentiment'][:7000]
+X = tfidf_vectorizer_vectors.toarray()
+Y = df['Sentiment'][:7000]
 
 
+
+# 方法2
 vec = CountVectorizer().fit(texts)
 bag_of_words = vec.transform(texts)
 sum_words = bag_of_words.sum(axis=0)
 words_freq = [(word, sum_words[0, idx]) for word, idx in vec.vocabulary_.items()]
 
 cvec_df = pd.DataFrame.from_records(words_freq, columns=['words', 'counts']).sort_values(by="counts", ascending=False)
-# 柱状图展示
-# cvec_df.head(10).plot.barh(figsize=(15, 3), width=0.4)
-plt.barh(cvec_df.head(10).words.to_list(),
-         cvec_df.head(10).counts.to_list()
-         )
-plt.show()
 
-# 词云展示
-cvec_dict = dict(zip(cvec_df.words, cvec_df.counts))
-
-wordcloud = WordCloud(width=800, height=400)
-wordcloud.generate_from_frequencies(frequencies=cvec_dict)
-plt.figure(figsize=(20, 10))
-plt.imshow(wordcloud, interpolation="bilinear")
-plt.axis("off")
-plt.show()
+# # 柱状图展示
+# # cvec_df.head(10).plot.barh(figsize=(15, 3), width=0.4)
+# plt.barh(cvec_df.head(10).words.to_list(),
+#          cvec_df.head(10).counts.to_list()
+#          )
+# plt.show()
+#
+# # 词云展示
+# cvec_dict = dict(zip(cvec_df.words, cvec_df.counts))
+#
+# wordcloud = WordCloud(width=800, height=400)
+# wordcloud.generate_from_frequencies(frequencies=cvec_dict)
+# plt.figure(figsize=(20, 10))
+# plt.imshow(wordcloud, interpolation="bilinear")
+# plt.axis("off")
+# plt.show()
 
 
 
