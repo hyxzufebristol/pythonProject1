@@ -12,18 +12,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from config import reduce_mem_usage
 
-df_concat = pd.read_csv('./data/clean/df_concat.csv', nrows=20000)
-df_concat = reduce_mem_usage(df_concat)
-
-# 2. the most top 30 words in newreview data
-# the reviews are mainly from the 'comment' column.
-
-reviews_details = df_concat[
-    ['id', 'name', 'host_id', 'host_name', 'date', 'reviewer_id', 'reviewer_name', 'comments', 'review_scores_value']]
-
-#
-# host_reviews = reviews_details.groupby(['host_id', 'host_name']).size().sort_values(ascending=False).to_frame(
-#     name="number_of_reviews")
 
 
 def col_comment_processing(reviews_details):
@@ -85,33 +73,9 @@ def comment_to_sentimentStrength(reviews_details):
     return reviews_details
 
 
-# 构建情感分析数据
-# 对comment列进行完整处理
-reviews_details = col_comment_processing(reviews_details)
-# 获得sentiment列，也就是文本情感强度
-reviews_details = comment_to_sentimentStrength(reviews_details)
-
-# create positive comments
-df_positive = reviews_details[reviews_details['sentiment'] > 0]
-# create negative comments
-df_negative = reviews_details[reviews_details['sentiment'] < 0]
-
-# 上述的内容仍然属于特征工程的内容
-# 用于构建完整数据集
-# reviews_details.to_csv("./data/sentiment/reviews_details.csv", index=False)
-# df_positive.to_csv("./data/sentiment/df_positive.csv", index=False)
-# df_negative.to_csv("./data/sentiment/df_negative.csv", index=False)
-# 如果需要使用完整数据集进行读取：
 
 
-# ---------------------------------------- 1. 针对文本情感分析分类----------------------
-#
-# 分析：其实从箱线图的分布可以看出来按照这个做分类的效果并不会很好
-# df_positive.boxplot(column="review_scores_value")
-# plt.show()
 
-# 先选取正向文本进行测试
-texts = df_positive.comments.tolist()
 def tfidf_commnets_vector(texts):
     """
     文本向量化的提取方法
@@ -130,8 +94,7 @@ def tfidf_commnets_vector(texts):
     X = tfidf_vectorizer_vectors.toarray()
     return X
 
-X = tfidf_commnets_vector(texts)
-Y_clf = df_positive.review_scores_value[:1000]
+
 
 # 输出top100 关键词
 def top_words_importance_plt(texts):
@@ -190,7 +153,7 @@ def top_words_importance_plt(texts):
     plt.show()
     # plt.savefig('tfidf_top100_wordCloud.png",dpi=500,bbox_inches = 'tight') # save the image.
 
-# top_words_importance_plt(texts)
+
 
 
 def sentiment_clf_rfc(X, y):
@@ -244,13 +207,66 @@ def sentiment_clf_dt(X, y):
     plt.show()
 
 
-# 输出top100 关键词
-# top_words_importance_plt(texts)
 
-# 随机森林分类模型
-# sentiment_clf_rfc(X, Y_clf)
 
-# 决策树模型
-# sentiment_clf_dt(X, Y_clf)
 
-# 后面再增加几个分类模型和一个集成模型，来对比一下效果可以（不一定必要）
+if __name__ == '__main__':
+    # ---------------------------------------- 1. 针对文本情感分析分类----------------------
+    df_concat = pd.read_csv('./data/clean/df_concat.csv', nrows=20000)
+    df_concat = reduce_mem_usage(df_concat)
+
+    # 2. the most top 30 words in newreview data
+    # the reviews are mainly from the 'comment' column.
+
+    reviews_details = df_concat[
+        ['id', 'name', 'host_id', 'host_name', 'date', 'reviewer_id', 'reviewer_name', 'comments',
+         'review_scores_value']]
+
+    #
+    # host_reviews = reviews_details.groupby(['host_id', 'host_name']).size().sort_values(ascending=False).to_frame(
+    #     name="number_of_reviews")
+
+    # TODO:构建情感分析数据
+    # 对comment列进行完整处理
+    reviews_details = col_comment_processing(reviews_details)
+    # 获得sentiment列，也就是文本情感强度
+    reviews_details = comment_to_sentimentStrength(reviews_details)
+
+    # create positive comments
+    df_positive = reviews_details[reviews_details['sentiment'] > 0]
+    # create negative comments
+    df_negative = reviews_details[reviews_details['sentiment'] < 0]
+
+    # 上述的内容仍然属于特征工程的内容
+    # 用于构建完整数据集
+    # reviews_details.to_csv("./data/sentiment/reviews_details.csv", index=False)
+    # df_positive.to_csv("./data/sentiment/df_positive.csv", index=False)
+    # df_negative.to_csv("./data/sentiment/df_negative.csv", index=False)
+    # 如果需要使用完整数据集进行读取：
+
+
+    # 分析：其实从箱线图的分布可以看出来按照这个做分类的效果并不会很好
+    # df_positive.boxplot(column="review_scores_value")
+    # plt.show()
+
+
+    # TODO：文本向量化+可视化
+    # 先选取正向文本进行测试
+    texts = df_positive.comments.tolist()
+    X = tfidf_commnets_vector(texts)
+    Y_clf = df_positive.review_scores_value[:1000]
+    #
+    top_words_importance_plt(texts)
+
+
+    # TODO: 模型效果评价
+    # 输出top100 关键词
+    top_words_importance_plt(texts)
+
+    # 随机森林分类模型
+    sentiment_clf_rfc(X, Y_clf)
+
+    # 决策树模型
+    sentiment_clf_dt(X, Y_clf)
+
+    # 后面再增加几个分类模型和一个集成模型，来对比一下效果可以（不一定必要）
