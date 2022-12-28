@@ -2,309 +2,328 @@
 # -*- coding: utf-8 -*-
 # author： Leo
 # datetime： 2022/12/22 20:58
+
+from io import StringIO
 import pandas as pd
+import pydotplus
+from imblearn.over_sampling import RandomOverSampler
 from nltk.corpus import stopwords
+from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from nltk.sentiment.vader import SentimentIntensityAnalyzer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from wordcloud import WordCloud
+from sklearn.linear_model import LinearRegression
+from sklearn.feature_selection import RFE
+from sklearn.preprocessing import PowerTransformer
 from config import *
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 import plotly.graph_objects as go
-from sklearn.model_selection import train_test_split, StratifiedKFold, GridSearchCV
+from sklearn.model_selection import train_test_split, StratifiedKFold, GridSearchCV, RandomizedSearchCV
 from sklearn.metrics import mean_absolute_error, accuracy_score, confusion_matrix, classification_report, roc_auc_score, \
-    roc_curve, auc, precision_score, recall_score, f1_score
-from sklearn.tree import DecisionTreeClassifier
+    roc_curve, auc, precision_score, recall_score, f1_score, mean_squared_error, r2_score
+from sklearn.tree import DecisionTreeClassifier, export_graphviz
 import re
+from os import path
+from PIL import Image
 import seaborn as sns
 import matplotlib.pyplot as plt
-import lightgbm
 import warnings
 import pandas as pd
 
 warnings.filterwarnings('ignore')
 
-"""
-这部分内容对词语进行了清洗但是并没有保存？
 
-"""
-df_concat = pd.read_csv('./data/clean/df_concat.csv', nrows=20000)
-df_concat = reduce_mem_usage(df_concat)
-
-# 2. the most top 30 words in newreview data
-# the reviews are mainly from the 'comment' column.
-
-reviews_details = df_concat[
-    ['id', 'name', 'host_id', 'host_name', 'date', 'reviewer_id', 'reviewer_name', 'comments', 'review_scores_value']]
-
-#
-host_reviews = reviews_details.groupby(['host_id', 'host_name']).size().sort_values(ascending=False).to_frame(
-    name="number_of_reviews")
-
-
-def col_comment_processing(reviews_details):
+def score_sentiment_comments(df_concat):
     """
-    针对评论数据当中的comments 列进行处理
-    要求：
-    1. 实现文本评论的清洗
-    2. 仅保留英文评论
-    :param reviews_details:
+    构建sentiment得分，构建方式返回的是一个(-1,1)的一个列值数据。
+    需要思考的是通过构建
+    :param df_concat:
     :return:
     """
-    # and the basic pre processing code for comment. take out empty comments. 并对评论的各种格式进行修改，其中存在很多无意义的连接和我们并不希望进行统计的内容
-    reviews_details = reviews_details[reviews_details['comments'].notnull()]
-    # remove numbers
-    reviews_details['comments'] = reviews_details['comments'].str.replace('\d+', '')
-    # all to lowercase
-    reviews_details['comments'] = reviews_details['comments'].str.lower()
-    # remove windows new line
-    reviews_details['comments'] = reviews_details['comments'].str.replace('\r\n', "")
-    # remove stopwords (from nltk library)
-    stop_english = stopwords.words("english")
-    reviews_details['comments'] = reviews_details['comments'].apply(lambda x: " ".join([i for i in x.split()
-                                                                                        if i not in (stop_english)]))
-    # remove punctuation
-    reviews_details['comments'] = reviews_details['comments'].str.replace('[^\w\s]', " ")
-    # replace x spaces by one space
-    reviews_details['comments'] = reviews_details['comments'].str.replace('\s+', ' ')
-
-    def is_english(row):
-        return bool(re.match(r'^[a-zA-Z\s]+$', row))
-
-    reviews_details['is_english'] = reviews_details.apply(lambda row: is_english(row['comments']), axis=1)
-    reviews_details = reviews_details.loc[reviews_details['is_english'] == True]
-
-    return reviews_details
-
-# 对comment列进行完整处理
-reviews_details = col_comment_processing(reviews_details)
-
-
-def comment_to_sentimentStrength(reviews_details):
-    """
-    通过对文本情感强度进行分析，获得对sentiment进行一个计算，增加了一个新的列，能够用于回归任务
-    :param reviews_details:
-    :return:
-    """
-    scorer = SentimentIntensityAnalyzer()  # 将comment
+    from nltk.sentiment.vader import SentimentIntensityAnalyzer
+    scorer = SentimentIntensityAnalyzer()
 
     def calculate_sentiment(comment):
         return (scorer.polarity_scores(comment)['compound'])
 
-    # TODO： 这部分是构建出来的完整数据集
-    reviews_details.loc[:, 'sentiment'] = reviews_details['comments'].apply(calculate_sentiment)
-    return reviews_details
-
-# 获得sentiment列，也就是文本情感强度
-reviews_details = comment_to_sentimentStrength(reviews_details)
-
-# create positive comments
-df_positive = reviews_details[reviews_details['sentiment'] > 0]
-# create negative comments
-df_negative = reviews_details[reviews_details['sentiment'] < 0]
-
-# ---------------------------------------- 1. 针对文本情感分析分类----------------------
-#
-
-# 先选取正向文本进行测试
-texts = df_positive.comments.tolist()
-# 文本向量化的提取方法
-# tfidf 提取方式
-texts = texts[:1000]
-# TfidfVectorizer 的效果就是CountVectorizer、TfidfTransformer的结合体
-# settings that you use for count vectorizer will go here
-tfidf_vectorizer = TfidfVectorizer(use_idf=True, max_features=20000)
-# just send in all your docs here
-tfidf_vectorizer_vectors = tfidf_vectorizer.fit_transform(texts)
-# 构建用于文本情感分类的xy数据
-X = tfidf_vectorizer_vectors.toarray()
-Y_clf = df_positive.review_scores_value[:1000]
+    df_concat.loc[:, 'sentiment'] = df_concat['comments'].apply(calculate_sentiment)
+    return df_concat
 
 
-# 输出top100 关键词
-def top_words_importance_plt(texts):
+def construct_dataset(df_concat):
     """
-    使用tf-idf对输入文本内容进行处理并输出top 100 的关键词
-    :param texts:
+    依据需求构建对应的数据集用于后续的分析。
+    :param df_concat:
     :return:
     """
-    # # 对文本进行词频统计
-    # vectorizer = CountVectorizer()
-    # vectorizer.fit_transform(texts)
-    # top_words = vectorizer.get_feature_names()
-    # print("Top words: {}".format(top_words[:100]))
+    # ---------------------------- 任务数据集构建 --------------------------
+    # 针对任务一
+    # Group the data by home and month
+    grouped_data = df_concat.groupby(['name', 'month'])
+    # Calculate the average monthly sentiment for each group
+    average_sentiment = grouped_data['sentiment'].mean()
+    # Select the top 100 rows based on the average monthly sentiment
+    top_homes = average_sentiment.nlargest(100)
+    # Print the top 100 homes with the largest average monthly sentiment
+    print(top_homes)
+    # 构建list
+    tuple_list = top_homes.index.to_list()
+    # Extract the first element of each tuple and construct a new list
+    new_list = [t[0] for t in tuple_list]
+    # Filter the dataframe based on the list of values
+    filtered_df1 = df_concat[df_concat['name'].isin(new_list)]
 
-    # Create a TfidfVectorizer object
-    vectorizer = TfidfVectorizer(max_features=100)
-    # Fit the vectorizer to the texts
-    vectorizer.fit(texts)
-    # Extract the top 100 features and their importance weights
-    features = vectorizer.get_feature_names()
-    importances = vectorizer.idf_
-    # Zip the features and importance weights together
-    keywords = zip(features, importances)
-    # Sort the keywords by importance weight in descending order
-    keywords = sorted(keywords, key=lambda x: x[1], reverse=True)
-    # Print the top 100 keywords and their importance weights
-    for keyword, importance in keywords[:100]:
-        print(f'{keyword}: {importance:.2f}')
+    # 针对任务二
+    # Group the data by host and month
+    grouped_data = df_concat.groupby(['host_name', 'month'])
+    # Calculate the average profit per month for each group
+    average_profit = grouped_data['profit_per_month'].mean()
+    # Select the top 100 rows based on the average profit per month
+    top_hosts = average_profit.nlargest(100)
+    # Print the top 100 hosts with the largest average profit per month
+    print(top_hosts)
+    # 构建list
+    tuple_list = top_hosts.index.to_list()
+    # Extract the first element of each tuple and construct a new list
+    new_list = [t[0] for t in tuple_list]
+    # Filter the dataframe based on the list of values
+    filtered_df2 = df_concat[df_concat['host_name'].isin(new_list)]
 
-# 输出top100 关键词
-top_words_importance_plt(texts)
+    # 针对任务3
+    # df_concat.date = df_concat.date.astype("datetime64")
+    # df_grouped = df_concat.groupby('host_name')
+    # result = {}
+    # output_sum = df_concat.groupby(['host_name'])['profit_per_month'].sum()
+    # # df_concat[df_concat.host_name=="Abbie"]['date']
+    # # df_grouped.date.groups["Abbie"]
+    # # df_concat.iloc[7153].date
 
-
-
-
-def sentiment_clf_rfc(X, y):
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
-
-    # ----------------- 模型1 随机森林 -----------------
-    # Create a RandomForestClassifier
-    clf = RandomForestClassifier(n_estimators=100, random_state=42)
-    # Fit the classifier on the training data
-    clf.fit(X_train, y_train)
-    # Make predictions on the test data
-    y_pred = clf.predict(X_test)
-    # Evaluate the performance of the classifier
-    accuracy = clf.score(X_test, y_test)
-    print('Accuracy of classification:', accuracy)
-
-    # 文本情感分析做分类，如果需要做回归的话用下面的代码，但是基本上都是做分类的
-    # Y_clf = df_positive.review_scores_value[:1000]
-    # X_train,X_test,y_train,y_test=train_test_split(X, Y_reg, test_size=0.2)
-    # reg = RandomForestRegressor()
-    # reg.fit(X_train, y_train)
-    # accuracy = reg.score(X_test, y_test)
-    # print('R2 of regression:', accuracy)
+    # 构建数据集：
 
 
-# sentiment_clf_rfc(X, Y_clf)
+def rfc_process(df):
+    """
+    1. 随机森铃实现分类，同时输出最终的权重比例
+    2. opt会消耗大量计算资源，谨慎运行
+    3. 实现了对随机森林的可视化，会自动保存到文件目录
+    :param X:
+    :param y:
+    :return:
+    """
+    X = df.drop('review_scores_value', axis=1)
+    y = df.review_scores_value[:X.shape[0]]
+
+    ros = RandomOverSampler()
+    x_train, y_train = ros.fit_resample(X, y)
+
+    train_x, val_x, train_y, val_y = train_test_split(x_train, y_train, test_size=0.3)
+
+    # ------------------------ model ------------------
+    model = RandomForestClassifier()  # RandomForestRegressor、RandomForestClassifier
+    pipe = Pipeline([('scaler', StandardScaler()),
+                     ('reduce_dim', PCA()),
+                     ('classifier', model)])
+    pipe.fit(train_x, train_y)
+    train_pred = pipe.predict(train_x)
+    val_pred = pipe.predict(val_x)
+
+    # ----------------------- find the importance tree -----------------
+    # 方法1
+    # dot_data = StringIO()
+    # export_graphviz(pipe.named_steps['classifier'].estimators_[0],
+    #                 out_file=dot_data)
+    # graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
+    # graph.write_png('tree.png')
+    ## Image(graph.create_png())
+    # 方法2
+    # Iterate over the trees in the classifier
+    from sklearn.tree import export_graphviz
+    from graphviz import Source
+    clf = pipe.steps[2][1]
+
+    # Get the tree
+    tree = clf.estimators_[-1]
+    # Export the tree to a graphviz file
+    export_graphviz(tree, out_file='tree.dot', feature_names=X.columns)
+    # Visualize the tree
+    with open('tree.dot') as f:
+        dot_graph = f.read()
+    s = Source(dot_graph)
+    s.view()
+
+    # ----------------------- feature importance -----------------
+    importances = model.feature_importances_
+    indices = np.argsort(importances)[::-1]
+    feat_labels = x_train.columns
+    for f in range(x_train.shape[1]):
+        print("{}) {} is {}".format(f + 1, feat_labels[indices[f]], importances[indices[f]]))
+
+    # ----------------------- opt -------------------
+    # n_estimators = [int(x) for x in np.linspace(start=10, stop=500, num=10)]
+    # max_features = [x+1 for x in range(11)]
+    # max_depth = [int(x) for x in np.linspace(start=1, stop=11, num=5)]
+    # min_samples_split = [int(x) for x in np.linspace(start=2, stop=50, num=5)]
+    # params = {'n_estimators': n_estimators,
+    #           'max_depth': max_depth,
+    #           'max_features': max_features,
+    #           'min_samples_split': min_samples_split
+    #           }
+    # cls = RandomizedSearchCV(model, params, cv=5, n_iter=10,n_jobs = -1)
+    # cls.fit(train_x, train_y)
+    # val_pred = cls.predict(val_x)
+    # train_pred = cls.predict(train_x)
+    # best_estimator = cls.best_estimator_
+    # print(best_estimator)
+    # print(cls.best_score_)
+
+    # ---------------------- model performance ----------------
+    print('Training RMSE:{}'.format(np.sqrt(mean_squared_error(train_y, train_pred))))
+    print('Test RMSE:{}'.format(np.sqrt(mean_squared_error(val_y, val_pred))))
+    print('Training R-squared:{}'.format(r2_score(train_y, train_pred)))
+    print('Test R-squared:{}'.format(r2_score(val_y, val_pred)))
 
 
-def sentiment_clf_dt(X, y):
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
-    # --------------------- 模型2 决策树 ----------------
-    dt = DecisionTreeClassifier(random_state=1234)
-    dt.fit(X_train, y_train)
-    y_pred_test = dt.predict(X_test)
-    print("Training Accuracy score: " + str(round(accuracy_score(y_train, dt.predict(X_train)), 4)))
-    print("Testing Accuracy score: " + str(round(accuracy_score(y_test, dt.predict(X_test)), 4)))
-    print(classification_report(y_test, y_pred_test))
+def regression(df_concat):
+    """
+    # Check the assumptions of linear regression
+    # Check for linear relationship between features and target
+    # Check for independence and normality of errors
+    # Check for constant variance of errors
+    :param X:
+    :param y:
+    :return:
+    """
+    # X = X[features]
+    # X=df.astype("float64")
+    # X = df_concat[['host_response_time', # 可以通过这样的方式对需要的数据变量进行筛选
+    #                      'host_response_rate',
+    #                      'host_is_superhost',
+    #                      'host_has_profile_pic',
+    #                      'host_identity_verified']].assign(const=1)
+    data = df_concat.select_dtypes(exclude='category')
+    X = data.astype("float64")
+    y = df_concat.sentiment + 1
 
-    cm = confusion_matrix(y_test, y_pred_test)
-    # print('Confusion matrix\n', cm)
-    cm_matrix = pd.DataFrame(data=cm
-                             # columns=['Actual Negative', 'Actual Neutral', 'Actual Positive'],
-                             # index=['Predict Negative', 'Predict Neutral', 'Predict Positive']
-                             )
-    sns.heatmap(cm_matrix, annot=True, fmt='d', cmap='YlGnBu')
+    # Choose the right features
+    # Use recursive feature elimination (RFE) to select the most important features
+    selector = RFE(LinearRegression())
+    selector = selector.fit(X, y)
+    X_new = X[X.columns[selector.support_]]
+
+    # Check for multicollinearity
+    # Compute variance inflation factor (VIF) for each feature
+    from statsmodels.stats.outliers_influence import variance_inflation_factor
+    vif = [variance_inflation_factor(X_new.values, i) for i in range(X_new.shape[1])]
+
+    # Remove features with high VIF
+    threshold = 5
+    res = []
+    for i in vif:
+        res.append(i > threshold)
+    X_new = X_new.drop(X_new.columns[res], axis=1)
+
+    # Transform the target variable
+    # Use Box-Cox transformation
+    from scipy.stats import boxcox
+    y_transformed, _ = boxcox(y)
+    ## Split the data into training and testing sets
+    # X_train, X_test, y_train, y_test = train_test_split(X_new, y_transformed, test_size=0.2)
+    #
+    # # Create a linear regression model
+    # model = LinearRegression()
+    # # Fit the model to the training data
+    # model.fit(X_train, y_train)
+    # # Predict the response for the testing data
+    # y_pred = model.predict(X_test)
+    #
+    # # Evaluate the model's performance
+    # mae = mean_absolute_error(y_test, y_pred)
+    # r2 = r2_score(y_test, y_pred)
+    # print(f'MAE: {mae:.2f}')
+    # print(f'R2: {r2:.2f}')
+    # # Print the model's coefficients
+    # print(f'Coefficients: {model.coef_}')
+
+    import statsmodels.api as sm
+    results = sm.OLS(y, X).fit()
+    print(results.summary())
+
+    # 绘制热力图
+    import seaborn as sns
+    # Create a larger figure
+    plt.figure(figsize=(20, 18))
+    # data = X_new.corr()
+    data = X.corr()
+    # Draw the heat map
+    sns.heatmap(data, cmap='cool', annot=True, fmt='.1f')
+    # Show the plot
     plt.show()
-
-
-# sentiment_clf_dt(X, Y_clf)
-# 模型2
-# 后面再增加几个分类模型和一个集成模型，来对比一下效果可以（不一定必要）
+    # plt.savefig("./data/hotmap.jpg",dpi=500,bbox_inches = 'tight')
 
 
 # -------------------------------- 2. 使用随机森林构建权重分析 -----------------------
 # 这一部分内容按照所有特征列,全部需要进行转化，并且不会用到有关NLP部分的col，并将review_scores_value作为最终的分类目标
 # 最终处理完成的数据集是reviews_details
 # 数据集需要重新更换成，并且构建两个随机森林：
-# 1.找到 average monthly sentiment最大的100家home做随机森林 name
-# 2.找到 average profit per month 最大的100家host做随机森林 host_name
+# 1.找到 average monthly sentiment最大的100家home（房源）做随机森林 name
+# 2.找到 average profit per month 最大的100家host(房东）做随机森林 host_name
+# 3.构建home（房源）当中所有月平均
+# 4，构建所有host name当中的月平均
 # 注意：
 # 1. 为了能够完成处理上述使用的reviews_details是缩小版本的，因为做了文本情感分类。
 #    所以这个地方的需要重新从df_concat 当中构建
 # 2. 由于前面代码的混乱，导致数据问题，所以我在这里只实现必要的特征，需要添加之前处理的
 #    特征请替换最开始读取的特征即可，然后在下面选择特征列的位置进行确认
-# Convert the date column to a datetime data type
-df_concat['date'] = pd.to_datetime(df_concat['date'])
-
-# Extract the year, month, and day from the date column
-df_concat['year'] = df_concat['date'].dt.year
-df_concat['month'] = df_concat['date'].dt.month
-df_concat['day'] = df_concat['date'].dt.day
-df_concat.loc[:, 'sentiment'] = df_concat['comments'].apply(calculate_sentiment)
-
-# 构建特征
-numerical_fea = list(df_concat.select_dtypes(exclude=['category']).columns)
-category_fea = list(filter(lambda x: x not in numerical_fea, list(df_concat.columns)))
-selected_cols = numerical_fea + [""]
-# ---------------------------- 任务数据集构建 --------------------------
-# 针对任务一
-# Group the data by home and month
-grouped_data = df_concat.groupby(['name', 'month'])
-# Calculate the average monthly sentiment for each group
-average_sentiment = grouped_data['sentiment'].mean()
-# Select the top 100 rows based on the average monthly sentiment
-top_homes = average_sentiment.nlargest(100)
-# Print the top 100 homes with the largest average monthly sentiment
-print(top_homes)
-# 构建list
-tuple_list = top_homes.index.to_list()
-# Extract the first element of each tuple and construct a new list
-new_list = [t[0] for t in tuple_list]
-# Filter the dataframe based on the list of values
-filtered_df1 = df_concat[df_concat['name'].isin(new_list)]
-
-# 针对任务二
-# Group the data by host and month
-grouped_data = df_concat.groupby(['host_name', 'month'])
-# Calculate the average profit per month for each group
-average_profit = grouped_data['profit_per_month'].mean()
-# Select the top 100 rows based on the average profit per month
-top_hosts = average_profit.nlargest(100)
-# Print the top 100 hosts with the largest average profit per month
-print(top_hosts)
-# 构建list
-tuple_list = top_hosts.index.to_list()
-# Extract the first element of each tuple and construct a new list
-new_list = [t[0] for t in tuple_list]
-# Filter the dataframe based on the list of values
-filtered_df2 = df_concat[df_concat['host_name'].isin(new_list)]
-
-# 构建Xy
-# TODO：将filtered_df1和filtered_df2 对下面的df进行替换就可以进行计算了
-df = df_concat.select_dtypes(exclude='category')
-X = df.drop('review_scores_value', axis=1)
-y = df.review_scores_value[:20000]  # 20000是最开始选择到的，28行
 
 
-def rfc_process(X, y):
-    """
-    随机森铃实现分类，同时输出最终的权重比例
-    :param X:
-    :param y:
-    :return:
-    """
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    # 模型1
-    # Create a RandomForestClassifier
-    clf = RandomForestClassifier(n_estimators=100, random_state=42)
-    # Fit the classifier on the training data
-    clf.fit(X_train, y_train)
-    # Make predictions on the test data
-    y_pred = clf.predict(X_test)
+"""
+There are several ways you can try to improve the R2 score of a linear regression model if it is not performing well. Here are a few suggestions:
+Check the assumptions of linear regression: Linear regression assumes that the relationship between the features and the target is linear, that the errors are independent and normally distributed, and that the errors have constant variance. If any of these assumptions is not met, the model's performance may be poor.
+Choose the right features: Linear regression is sensitive to the choice of features. Make sure that the features you select are relevant and have a strong relationship with the target. You can use techniques like feature selection or feature engineering to identify the most important features.
+Check for multicollinearity: If the features are highly correlated with each other, it can affect the model's performance. You can check for multicollinearity using techniques like variance inflation factor (VIF) or by examining the correlation matrix.
+Transform the target variable: If the target variable is not normally distributed, you can try transforming it using techniques like log transformation or Box-Cox transformation.
+Try different model types: If linear regression is not performing well, you can try other types of models, such as non-linear models or ensemble models, which may be more suitable for your data.
+"""
+"""
+文字说明：
+多元线性回归流程
+（前面用到的那个步骤，消除共线性RFE）
+1. 首先我们使用函数rfr_process() 来构建随机森林pipline，其中主要用到的方法流程为：
+    使用StandardScaler来进行归一化，然后使用PCA降维，能够降低模型变量的维度，然后使用随机森林的回归模型来进行拟合
+    由于随机森林作为树状模型，对于多重共线性的敏感程度要比线性模型要低很多，因此我们使用归一化和PCA降维的方式来提升模型的优度，另外还使用Hyperparameter optimization method to improve model performance。
+    另外，随机森林能够对变量进行重要程度分析，这部分内容有利于进一步选择和降低模型的维度，为我们构建线性回归模型提供一定的参考价值。
+    并且我们输出了最终构建成功的模型的参数，可视化树状图，以及变量的重要程度。
+2. 其次，使用regression()函数来构建回归模型：
+    我们的最终目的是能够获得R2接近1并且MSE尽可能小的模型。
+    值得注意的是在归回模型当中我们需要解决多重共线性问题，在本文当中使用了如下步骤进行模型的拟合：
+    1. Choose the right features, Use recursive feature elimination (RFE) to select the most important features
+    2. Check for multicollinearity, Compute variance inflation factor (VIF) for each feature
+    3. 使用sm.OLS来对数据模型进行拟合，模型的最终结果（你自己描述一下）并使用热力图对数据变量的相关系数进行了可视化展示。
+    
+"""
 
-    # Evaluate the performance of the classifier
-    # Calculate the evaluation metrics
-    accuracy = accuracy_score(y_test, y_pred)
-    precision = precision_score(y_test, y_pred, average='micro')
-    recall = recall_score(y_test, y_pred, average='micro')
-    f1 = f1_score(y_test, y_pred, average='micro')
+if __name__ == '__main__':
+    df_concat = pd.read_csv('./data/clean/df_concat.csv', nrows=20000) # 防止计算量过大，没有进行全量运算
+    df_concat = reduce_mem_usage(df_concat)
 
-    # Print the evaluation metrics
-    print(f'Accuracy: {accuracy:.2f}')
-    print(f'Precision: {precision:.2f}')
-    print(f'Recall: {recall:.2f}')
-    print(f'F1 score: {f1:.2f}')
+    # 增加sentiment评分这一列
+    df_concat = score_sentiment_comments(df_concat)
 
-    # Get the feature importances
-    importances = clf.feature_importances_
-    feature_names = X.columns
+    # TODO:构建特征
+    # numerical_fea = list(df_concat.select_dtypes(exclude=['category']).columns)
+    # category_fea = list(filter(lambda x: x not in numerical_fea, list(df_concat.columns)))
+    # selected_cols = numerical_fea + [""]
 
-    # Sort the feature importance ranks in descending order
-    sorted_importances = sorted(zip(importances, feature_names), reverse=True)
+    # -------------------------------- 构建数据集 --------------------------
+    # X,y 在进入函数之后再进行拆分
+    # TODO：将filtered_df1和filtered_df2 对下面的df进行替换就可以进行计算了
+    # df = construct_dataset(df_concat) # 在这个地方进行数据集切换
+    df = df_concat.select_dtypes(exclude='category')  # 这个地方对列进行选择！通过上一个todo里面的selected_cols来进行选择
+    df = df.dropna()
 
-    # Print the sorted feature importance ranks with feature names
-    print('Feature importance ranks:')
-    for i, (importance, feature_name) in enumerate(sorted_importances):
-        print(f'{i + 1}: {feature_name} ({importance:.2f})')
+    # 上述文本解释当中提及到的两个函数
+    rfc_process(df)
+
+    regression(df)
+    print("Success")

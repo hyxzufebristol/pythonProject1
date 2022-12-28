@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*- 
 # @Time : 2022/11/18 16:35 
 # @Author : YeMeng 
-# @File : demo.py 
+# @File : demo_dataprocess.py
 # @contact: 876720687@qq.com
 
 
@@ -11,7 +11,7 @@ from folium.plugins import FastMarkerCluster
 import missingno as msno
 from matplotlib import pyplot as plt
 from config import *
-from math import asin,sin,cos,sqrt
+from math import asin, sin, cos, sqrt
 import missingno as msno
 import numpy as np
 import pandas as pd
@@ -19,21 +19,6 @@ from config import *
 import warnings
 
 warnings.filterwarnings('ignore')
-# zero step
-df_listings = pd.read_csv('./data/raw/listings.csv')
-# df_listings = pd.read_csv('./data/raw/listings.csv', nrows=10000)
-df_listings = reduce_mem_usage(df_listings)
-df_reviews = pd.read_csv('./data/raw/reviews.csv')
-# df_reviews = pd.read_csv('./data/raw/reviews.csv', nrows=10000)
-df_reviews = reduce_mem_usage(df_reviews)
-
-
-# # 缺失值可视化
-# msno.matrix(df_listings, labels=True)
-# # 热力图可视化
-# msno.heatmap(df_listings)
-# # 树状图可视化
-# msno.dendrogram(df_listings)
 
 
 def df_listings_processing(df_listings):
@@ -68,7 +53,8 @@ def df_listings_processing(df_listings):
         return (float(price.replace('$', '').replace(',', '')))
 
     df_listings_drop5['price_$'] = df_listings_drop5['price'].apply(format_price).astype("float32")
-    df_listings_drop5['profit_per_month'] = df_listings_drop5['price_$'] * df_listings_drop5['reviews_per_month'] / df_listings_drop5['review_scores_rating']
+    df_listings_drop5['profit_per_month'] = df_listings_drop5['price_$'] * df_listings_drop5['reviews_per_month'] / \
+                                            df_listings_drop5['review_scores_rating']
 
     # 处理host相关变量
     # replace 't' to '1', and 'f' to '0' in the columns of 'host_is_superhost','host_has_profile_pic','host_identity_verified','instant_bookable'
@@ -76,10 +62,6 @@ def df_listings_processing(df_listings):
     tf_cols = ['host_is_superhost', 'host_has_profile_pic', 'host_identity_verified', 'instant_bookable']
     for tf_col in tf_cols:
         df_listings_drop5[tf_col] = df_listings_drop5[tf_col].map({'t': 1, 'f': 0})
-    # df['host_is_superhost'] = df['host_is_superhost'].map({'t':1,'f':0})
-    # df['host_has_profile_pic'] = df['host_has_profile_pic'].map({'t':1,'f':0})
-    # df['host_identity_verified'] = df['host_identity_verified'].map({'t':1,'f':0})
-    # df['instant_bookable'] = df['instant_bookable'].map({'t':1,'f':0})
 
     # as for the column of 'host_response_rate', Converts 'string' to 'int' format
     df_listings_drop5['host_response_rate'] = df_listings_drop5['host_response_rate'].str.strip('%').astype(float) / 100
@@ -99,49 +81,69 @@ def df_listings_processing(df_listings):
                                          df_listings['review_scores_location'] +
                                          df_listings['review_scores_value']) / 6
 
-    df_listings['distance']=2*6371*(
+    # 增加筛选方法当中需要要求distance在一定的距离限制范围值之内
+    # 错误写法
+    # df['distance']=2*6371*asin(
+    #     sqrt(
+    #         sin((df['latitude'] + 37.82) / 2) ** 2 +
+    #         cos(df['latitude']) * cos(df['latitude']) * (sin((df['longitude']-144.96)/2)**2)
+    #          )
+    # )
+    df_listings['distance'] = 2 * 6371 * (
         (
-            ((df_listings['latitude'] + 37.82) / 2).apply(sin)**2 +
-            (df_listings['latitude']).apply(cos) * (df_listings['latitude']).apply(cos) * (((df_listings['longitude']-144.96)/2).apply(sin)**2)
-         ).apply(sqrt)
+                ((df_listings['latitude'] + 37.82) / 2).apply(sin) ** 2 +
+                (df_listings['latitude']).apply(cos) * (df_listings['latitude']).apply(cos) * (
+                            ((df_listings['longitude'] - 144.96) / 2).apply(sin) ** 2)
+        ).apply(sqrt)
     ).apply(asin)
 
     return df_listings
 
 
-df_listings = df_listings_processing(df_listings)
-
 ## ------------------------------- 处理reviews -------------------------
-# delete comments missing value
-# 由于我们的问题focus on消费者的评论信息，因此值保留评论信息完整的所有数据
-df_reviews = df_reviews[~df_reviews['comments'].isna()]
+def df_review_processing(df_reviews):
+    # delete comments missing value
+    # 由于我们的问题focus on消费者的评论信息，因此值保留评论信息完整的所有数据
+    df_reviews = df_reviews[~df_reviews['comments'].isna()]
 
-# drop rows that 'listing_id' doesn't exist in the 'id' of 'listings' and create a new dataset'concat'
-# merge dataset 'listings' and 'reviews' with the same 'id'
-df_reviews.drop(columns=['id'], inplace=True)
-df_reviews = df_reviews.rename(columns={'listing_id': 'id'})
+    # ---------------- 时间类数据处理 -------
+    # Convert the date column to a datetime data type
+    df_reviews['date'] = pd.to_datetime(df_reviews['date'])
+    # Extract the year, month, and day from the date column
+    df_reviews['year'] = df_reviews['date'].dt.year
+    df_reviews['month'] = df_reviews['date'].dt.month
+    df_reviews['day'] = df_reviews['date'].dt.day
 
-# 合并数据集
-df_concat = pd.merge(df_listings, df_reviews, how="inner", on='id')
+    # drop rows that 'listing_id' doesn't exist in the 'id' of 'listings' and create a new dataset'concat'
+    # merge dataset 'listings' and 'reviews' with the same 'id'
+    df_reviews.drop(columns=['id'], inplace=True)
+    df_reviews = df_reviews.rename(columns={'listing_id': 'id'})
+    return df_reviews
 
-# -------------------- 对处理完毕的数据进行合并 -------------
-# ----------------------- 合并dataframe -----------------
-# 这部分内容是完成了listing 和reviews两个数据集的合并，并将其保存到了df_concat.csv 文件当中
-df_concat.to_csv("./data/clean/df_concat.csv", index=False)
-df_listings.to_csv("./data/clean/df_listings.csv", index=False)
 
-# 增加筛选方法当中需要要求distance在一定的距离限制范围值之内
-# 错误写法
-# df['distance']=2*6371*asin(
-#     sqrt(
-#         sin((df['latitude'] + 37.82) / 2) ** 2 +
-#         cos(df['latitude']) * cos(df['latitude']) * (sin((df['longitude']-144.96)/2)**2)
-#          )
-# )
-## 修改之后
-# df['distance']=2*6371*(
-#     (
-#         ((df['latitude'] + 37.82) / 2).apply(sin)**2 +
-#         (df['latitude']).apply(cos) * (df['latitude']).apply(cos) * (((df['longitude']-144.96)/2).apply(sin)**2)
-#      ).apply(sqrt)
-# ).apply(asin)
+if __name__ == '__main__':
+    # zero step
+    df_listings = pd.read_csv('./data/raw/listings.csv')
+    # df_listings = pd.read_csv('./data/raw/listings.csv', nrows=10000)
+    df_listings = reduce_mem_usage(df_listings)
+    df_reviews = pd.read_csv('./data/raw/reviews.csv')
+    # df_reviews = pd.read_csv('./data/raw/reviews.csv', nrows=10000)
+    df_reviews = reduce_mem_usage(df_reviews)
+
+    # # 缺失值可视化
+    # msno.matrix(df_listings, labels=True)
+    # # 热力图可视化
+    # msno.heatmap(df_listings)
+    # # 树状图可视化
+    # msno.dendrogram(df_listings)
+
+    # -------------------- 对处理完毕的数据进行合并 -------------
+    # ----------------------- 合并dataframe -----------------
+    # 这部分内容是完成了listing 和reviews两个数据集的合并，并将其保存到了df_concat.csv 文件当中
+    df_listings = df_listings_processing(df_listings)
+    df_reviews = df_review_processing(df_reviews)
+    df_concat = pd.merge(df_listings, df_reviews, how="inner", on='id')
+
+    df_concat.to_csv("./data/clean/df_concat.csv", index=False)
+    # df_listings.to_csv("./data/clean/df_listings.csv", index=False)
+    print("Processing success!")

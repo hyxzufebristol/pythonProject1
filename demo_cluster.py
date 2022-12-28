@@ -1,16 +1,13 @@
 # -*- coding: utf-8 -*- 
 # @Time : 2022/12/17 12:08 
 # @Author : YeMeng 
-# @File : demo2.py 
+# @File : demo_cluster.py
 # @contact: 876720687@qq.com
 
 import pandas as pd
 from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans
 from config import *
-
-df = pd.read_csv("./data/clean/df_concat.csv", nrows=1000)
-df = reduce_mem_usage(df)
 
 
 def kmeans_process(df):
@@ -82,6 +79,7 @@ def kmeans_cluter(df):
     # cat_df_km.to_csv("./data/clean/listing_cluster.csv")
     return cat_df_km
 
+
 def dbscan_cluter(df):
     """
     最终核对结果发现还是上面的方式比较好用
@@ -105,6 +103,10 @@ def dbscan_cluter(df):
     return df
 
 
-kmeans_process(df)
-df_cluter = kmeans_cluter(df)
-# df_cluter = dbscan_cluter(df)
+if __name__ == '__main__':
+    df = pd.read_csv("./data/clean/df_concat.csv", nrows=1000)
+    df = reduce_mem_usage(df)
+
+    kmeans_process(df)
+    df_cluter = kmeans_cluter(df)
+    # df_cluter = dbscan_cluter(df)
