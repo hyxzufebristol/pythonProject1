@@ -17,6 +17,8 @@ import numpy as np
 import pandas as pd
 from config import *
 import warnings
+pd.set_option('display.max_rows', 100)
+pd.set_option('display.max_columns', 100)
 
 warnings.filterwarnings('ignore')
 
@@ -28,40 +30,64 @@ def df_listings_processing(df_listings):
     :return:
     """
     drops = [
-        "last_scraped",
-        "calendar_last_scraped",
-        "host_acceptance_rate",
-        "host_total_listings_count",
-        "host_neighbourhood",
-        "neighbourhood",
-        "picture_url",
-        "host_url",
+        # url类的暂时都用不到
+        "listing_url",
         "host_thumbnail_url",
         "host_picture_url",
-        "has_availability"
+        "picture_url",
+        "host_url",
+
+        "host_id", # 这个id好像确实是没有什么用
+        "host_location", # 区域位置，并不是经纬度
+        # "host_acceptance_rate",
+        "neighbourhood_cleansed",  # 30类
+
+        # 房间的设施
+        "amenities", # 房间包含的设施
+        "bathrooms_text", # bath的种类,30类
+        'bedrooms', 'beds',
+
+
+
+
+        ## 时间类变量
+        "first_review", "last_review", "calendar_last_scraped","last_scraped","host_since",
+
+        # # 这两个可以用来构建关系网
+        "host_neighbourhood",  #
+        "neighbourhood"  #
+
+        # 文本评论内容
+        # "host_about",
+        # "description",
+        # "neighborhood_overview"
     ]
     df_listings_drop0 = df_listings.drop(columns=drops)
+    # df_listings_drop0 = df_listings
     df_listings_drop1 = df_listings_drop0.dropna(
         subset=['reviews_per_month', 'review_scores_rating', 'review_scores_accuracy'])
     # delete the rows that contain missing values of amenities
-    df_listings_drop2 = df_listings_drop1.dropna(subset=['bathrooms_text', 'bedrooms', 'beds'])
+    # df_listings_drop2 = df_listings_drop1.dropna(subset=['bathrooms_text', 'bedrooms', 'beds'])
+    df_listings_drop2 = df_listings_drop1
     df_listings_drop3 = df_listings_drop2.dropna(axis=1, how='all')
     df_listings_drop4 = df_listings_drop3.dropna(subset=['description', 'neighborhood_overview', 'host_about'])
     df_listings_drop5 = df_listings_drop4.dropna(subset=['host_response_time', 'host_response_rate'])
 
+    # 对价格类变量进行处理
     def format_price(price):
         return (float(price.replace('$', '').replace(',', '')))
 
     df_listings_drop5['price_$'] = df_listings_drop5['price'].apply(format_price).astype("float32")
     df_listings_drop5['profit_per_month'] = df_listings_drop5['price_$'] * df_listings_drop5['reviews_per_month'] / \
                                             df_listings_drop5['review_scores_rating']
+    df_listings_drop5.drop(columns=['price'],inplace=True)
 
     # 处理host相关变量
     # replace 't' to '1', and 'f' to '0' in the columns of 'host_is_superhost','host_has_profile_pic','host_identity_verified','instant_bookable'
     # Convert 't', 'f' to 1, 0
-    tf_cols = ['host_is_superhost', 'host_has_profile_pic', 'host_identity_verified', 'instant_bookable']
+    tf_cols = ['host_is_superhost', 'host_has_profile_pic', 'host_identity_verified', 'instant_bookable', 'has_availability']
     for tf_col in tf_cols:
-        df_listings_drop5[tf_col] = df_listings_drop5[tf_col].map({'t': 1, 'f': 0})
+        df_listings_drop5[tf_col] = df_listings_drop5[tf_col].map({'t': 1, 'f': 0}).astype("int64")
 
     # as for the column of 'host_response_rate', Converts 'string' to 'int' format
     df_listings_drop5['host_response_rate'] = df_listings_drop5['host_response_rate'].str.strip('%').astype(float) / 100
@@ -97,6 +123,8 @@ def df_listings_processing(df_listings):
         ).apply(sqrt)
     ).apply(asin)
 
+    df_listings.host_response_time.astype("int64")
+
     return df_listings
 
 
@@ -123,11 +151,11 @@ def df_review_processing(df_reviews):
 
 if __name__ == '__main__':
     # zero step
-    df_listings = pd.read_csv('./data/raw/listings.csv')
-    # df_listings = pd.read_csv('./data/raw/listings.csv', nrows=10000)
+    # df_listings = pd.read_csv('./data/raw/listings.csv')
+    df_listings = pd.read_csv('./data/raw/listings.csv', nrows=10000)
     df_listings = reduce_mem_usage(df_listings)
-    df_reviews = pd.read_csv('./data/raw/reviews.csv')
-    # df_reviews = pd.read_csv('./data/raw/reviews.csv', nrows=10000)
+    # df_reviews = pd.read_csv('./data/raw/reviews.csv')
+    df_reviews = pd.read_csv('./data/raw/reviews.csv', nrows=10000)
     df_reviews = reduce_mem_usage(df_reviews)
 
     # # 缺失值可视化
@@ -137,8 +165,7 @@ if __name__ == '__main__':
     # # 树状图可视化
     # msno.dendrogram(df_listings)
 
-    # -------------------- 对处理完毕的数据进行合并 -------------
-    # ----------------------- 合并dataframe -----------------
+    # -------------------- 对处理完毕的数据进行合并合并dataframe -------------
     # 这部分内容是完成了listing 和reviews两个数据集的合并，并将其保存到了df_concat.csv 文件当中
     df_listings = df_listings_processing(df_listings)
     df_reviews = df_review_processing(df_reviews)

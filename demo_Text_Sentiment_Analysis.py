@@ -1,4 +1,3 @@
-
 from nltk.corpus import stopwords
 from sklearn.ensemble import RandomForestClassifier
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
@@ -11,7 +10,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import pandas as pd
 from config import reduce_mem_usage
-
 
 
 def col_comment_processing(reviews_details):
@@ -73,9 +71,6 @@ def comment_to_sentimentStrength(reviews_details):
     return reviews_details
 
 
-
-
-
 def tfidf_commnets_vector(texts):
     """
     文本向量化的提取方法
@@ -85,7 +80,6 @@ def tfidf_commnets_vector(texts):
     :return:
     """
     # tfidf 提取方式
-    texts = texts[:1000]
     # settings that you use for count vectorizer will go here
     tfidf_vectorizer = TfidfVectorizer(use_idf=True, max_features=20000)
     # just send in all your docs here
@@ -93,7 +87,6 @@ def tfidf_commnets_vector(texts):
     # 构建用于文本情感分类的xy数据
     X = tfidf_vectorizer_vectors.toarray()
     return X
-
 
 
 # 输出top100 关键词
@@ -154,8 +147,6 @@ def top_words_importance_plt(texts):
     # plt.savefig('tfidf_top100_wordCloud.png",dpi=500,bbox_inches = 'tight') # save the image.
 
 
-
-
 def sentiment_clf_rfc(X, y):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
     # ----------------- 模型1 随机森林 -----------------
@@ -171,9 +162,11 @@ def sentiment_clf_rfc(X, y):
 
     cm = confusion_matrix(y_test, y_pred_test)
     # print('Confusion matrix\n', cm)
-    cm_matrix = pd.DataFrame(data=cm
+    cm_matrix = pd.DataFrame(data=cm,
                              # columns=['Actual Negative', 'Actual Neutral', 'Actual Positive'],
                              # index=['Predict Negative', 'Predict Neutral', 'Predict Positive']
+                             columns=['Actual Negative', 'Actual Positive'],
+                             index=['Predict Negative', 'Predict Positive']
                              )
     sns.heatmap(cm_matrix, annot=True, fmt='d', cmap='YlGnBu')
     plt.show()
@@ -199,74 +192,90 @@ def sentiment_clf_dt(X, y):
 
     cm = confusion_matrix(y_test, y_pred_test)
     # print('Confusion matrix\n', cm)
-    cm_matrix = pd.DataFrame(data=cm
+    cm_matrix = pd.DataFrame(data=cm,
                              # columns=['Actual Negative', 'Actual Neutral', 'Actual Positive'],
                              # index=['Predict Negative', 'Predict Neutral', 'Predict Positive']
+                             columns=['Actual Negative', 'Actual Positive'],
+                             index=['Predict Negative', 'Predict Positive']
                              )
     sns.heatmap(cm_matrix, annot=True, fmt='d', cmap='YlGnBu')
     plt.show()
 
 
-
-
-
 if __name__ == '__main__':
     # ---------------------------------------- 1. 针对文本情感分析分类----------------------
-    df_concat = pd.read_csv('./data/clean/df_concat.csv', nrows=20000)
-    df_concat = reduce_mem_usage(df_concat)
-
-    # 2. the most top 30 words in newreview data
-    # the reviews are mainly from the 'comment' column.
-
-    reviews_details = df_concat[
-        ['id', 'name', 'host_id', 'host_name', 'date', 'reviewer_id', 'reviewer_name', 'comments',
-         'review_scores_value']]
-
+    # # df_concat = pd.read_csv('./data/clean/df_concat.csv', nrows=20000)
+    # df_concat = pd.read_csv('./data/clean/df_concat.csv')
+    # df_concat = reduce_mem_usage(df_concat)
     #
-    # host_reviews = reviews_details.groupby(['host_id', 'host_name']).size().sort_values(ascending=False).to_frame(
-    #     name="number_of_reviews")
+    # # 2. the most top 30 words in newreview data
+    # # the reviews are mainly from the 'comment' column.
+    #
+    # # reviews_details = df_concat[
+    # #     ['id', 'name', 'host_id', 'host_name', 'date', 'reviewer_id', 'reviewer_name', 'comments',
+    # #      'review_scores_value']]
+    # reviews_details = df_concat
+    #
+    # #
+    # # host_reviews = reviews_details.groupby(['host_id', 'host_name']).size().sort_values(ascending=False).to_frame(
+    # #     name="number_of_reviews")
+    #
+    # # TODO:构建情感分析数据
+    # # 对comment列进行完整处理
+    # reviews_details = col_comment_processing(reviews_details)
+    # # 获得sentiment列，也就是文本情感强度
+    # reviews_details = comment_to_sentimentStrength(reviews_details)
+    #
+    # # create positive comments
+    # df_positive = reviews_details[reviews_details['sentiment'] > 0]
+    # # create negative comments
+    # df_negative = reviews_details[reviews_details['sentiment'] < 0]
+    #
+    # # 上述的内容仍然属于特征工程的内容
+    # # 用于构建完整数据集
+    # # reviews_details.to_csv("./data/sentiment/reviews_details.csv", index=False)
+    # # df_positive.to_csv("./data/sentiment/df_positive.csv", index=False)
+    # # df_negative.to_csv("./data/sentiment/df_negative.csv", index=False)
+    # # 如果需要使用完整数据集进行读取：
+    #
+    # # 分析：其实从箱线图的分布可以看出来按照这个做分类的效果并不会很好
+    # # df_positive.boxplot(column="review_scores_value")
+    # # plt.show()
 
-    # TODO:构建情感分析数据
-    # 对comment列进行完整处理
-    reviews_details = col_comment_processing(reviews_details)
-    # 获得sentiment列，也就是文本情感强度
-    reviews_details = comment_to_sentimentStrength(reviews_details)
-
-    # create positive comments
-    df_positive = reviews_details[reviews_details['sentiment'] > 0]
-    # create negative comments
-    df_negative = reviews_details[reviews_details['sentiment'] < 0]
-
-    # 上述的内容仍然属于特征工程的内容
-    # 用于构建完整数据集
-    # reviews_details.to_csv("./data/sentiment/reviews_details.csv", index=False)
-    # df_positive.to_csv("./data/sentiment/df_positive.csv", index=False)
-    # df_negative.to_csv("./data/sentiment/df_negative.csv", index=False)
-    # 如果需要使用完整数据集进行读取：
+    # TODO: 构建完毕之后直接读取就行了
+    reviews_details = pd.read_csv("./data/sentiment/reviews_details.csv")
 
 
-    # 分析：其实从箱线图的分布可以看出来按照这个做分类的效果并不会很好
-    # df_positive.boxplot(column="review_scores_value")
-    # plt.show()
+    # df_positive = pd.read_csv("./data/sentiment/df_positive.csv")
+    # df_negative = pd.read_csv("./data/sentiment/df_negative.csv")
 
+    # TODO:sentiment离散化
+    def sentiment(rating):
+        if rating >= 0:
+            return 1
+        else:
+            return -1
+        # else:
+        #     return 0
+
+
+    reviews_details['Sentiment_posneg'] = reviews_details['sentiment'].apply(sentiment)
 
     # TODO：文本向量化+可视化
     # 先选取正向文本进行测试
-    texts = df_positive.comments.tolist()
-    X = tfidf_commnets_vector(texts)
-    Y_clf = df_positive.review_scores_value[:1000]
-    #
-    top_words_importance_plt(texts)
-
+    texts = reviews_details.comments.tolist()  # 积极评论
+    # texts = df_negative.comments.tolist() # 消极评论
+    X = tfidf_commnets_vector(texts[:10000])
+    Y_clf = reviews_details.Sentiment_posneg[:10000]
 
     # TODO: 模型效果评价
     # 输出top100 关键词
-    top_words_importance_plt(texts)
+    # top_words_importance_plt(texts)
 
-    # 随机森林分类模型
+    # # 随机森林分类模型
     sentiment_clf_rfc(X, Y_clf)
-
-    # 决策树模型
-    sentiment_clf_dt(X, Y_clf)
+    #
+    # # 决策树模型
+    # sentiment_clf_dt(X, Y_clf)
 
     # 后面再增加几个分类模型和一个集成模型，来对比一下效果可以（不一定必要）

@@ -34,23 +34,6 @@ import pandas as pd
 warnings.filterwarnings('ignore')
 
 
-def score_sentiment_comments(df_concat):
-    """
-    构建sentiment得分，构建方式返回的是一个(-1,1)的一个列值数据。
-    需要思考的是通过构建
-    :param df_concat:
-    :return:
-    """
-    from nltk.sentiment.vader import SentimentIntensityAnalyzer
-    scorer = SentimentIntensityAnalyzer()
-
-    def calculate_sentiment(comment):
-        return (scorer.polarity_scores(comment)['compound'])
-
-    df_concat.loc[:, 'sentiment'] = df_concat['comments'].apply(calculate_sentiment)
-    return df_concat
-
-
 def construct_dataset(df_concat):
     """
     依据需求构建对应的数据集用于后续的分析。
@@ -184,6 +167,56 @@ def rfc_process(df):
     print('Test R-squared:{}'.format(r2_score(val_y, val_pred)))
 
 
+def rfr_process(df):
+    from sklearn.ensemble import RandomForestRegressor
+    from sklearn.model_selection import train_test_split
+
+    X = df.drop('sentiment', axis=1)
+    y = df.sentiment[:X.shape[0]]
+
+    # Split the data into training and test sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    # Train a random forest model
+    model = RandomForestRegressor(n_estimators=100, random_state=42)
+    model.fit(X_train, y_train)
+
+    # Make predictions on the test set
+    predictions = model.predict(X_test)
+
+    # importance
+    importances = model.feature_importances_
+    indices = np.argsort(importances)[::-1]
+    feat_labels = X_train.columns
+    for f in range(X_train.shape[1]):
+        print("{}) {} is {}".format(f + 1, feat_labels[indices[f]], importances[indices[f]]))
+
+    # Create a pandas DataFrame with the feature names and importance scores
+    df = pd.DataFrame({'feature': X_train.columns, 'importance': importances})
+
+    # Sort the DataFrame by importance in descending order
+    df.sort_values(by='importance', ascending=False, inplace=True)
+    df = df.head(10)
+
+    # plot a color histogram
+    # Plot a color histogram of the feature importances
+    # Choose a color palette
+    colors = ['coral', 'dodgerblue', 'seagreen', 'orchid', 'darkorange', 'slategray', 'teal', 'purple', 'pink',
+              'limegreen']
+
+    # Plot a bar plot of the top 10 feature importances
+    ax=df.plot.bar(x='feature', y='importance', color=colors, figsize=(8, 6))
+    # Add text labels on top of the bars
+    for i, label in enumerate(df['importance']):
+        ax.text(i, label + 0.01, f'{label:.2f}', ha='center', va='bottom', fontsize=11)
+    plt.title('Feature Importances')
+    plt.ylabel('Importance Score')
+    plt.xlabel('Feature')
+    plt.tight_layout()
+    # plt.xticks(rotation=45)
+    plt.show()
+
+
 def regression(df_concat):
     """
     # Check the assumptions of linear regression
@@ -194,30 +227,38 @@ def regression(df_concat):
     :param y:
     :return:
     """
+    # ----------------------- 数据读取部分 --------------------
     # X = X[features]
     # X=df.astype("float64")
-    # X = df_concat[['host_response_time', # 可以通过这样的方式对需要的数据变量进行筛选
-    #                      'host_response_rate',
-    #                      'host_is_superhost',
-    #                      'host_has_profile_pic',
-    #                      'host_identity_verified']].assign(const=1)
-    data = df_concat.select_dtypes(exclude='category')
-    X = data.astype("float64")
+    X = df_concat[['host_response_time',  # 可以通过这样的方式对需要的数据变量进行筛选
+                   'host_response_rate',
+                   'host_is_superhost',
+                   'host_has_profile_pic',
+                   'host_identity_verified']]
+
+    # data = df_concat.select_dtypes(exclude='category')
+    # X = data.astype("float64")
+    X.host_response_rate = X.host_response_rate.astype("float64")
     y = df_concat.sentiment + 1
 
-    # Choose the right features
+    # ------------------------ 特征选择、消除共线性 ------------------------
+    # TODO:
+    # X=X.apply(lambda x: (x - x.min()) / (x.max() - x.min()))
+    # X=X.dropna(axis=0)
+    # TODO:Choose the right features
     # Use recursive feature elimination (RFE) to select the most important features
-    selector = RFE(LinearRegression())
-    selector = selector.fit(X, y)
-    X_new = X[X.columns[selector.support_]]
+    # selector = RFE(LinearRegression())
+    # selector = selector.fit(X, y)
+    # X_new = X[X.columns[selector.support_]]
+    X_new = X
 
-    # Check for multicollinearity
+    # TODO:Check for multicollinearity
     # Compute variance inflation factor (VIF) for each feature
     from statsmodels.stats.outliers_influence import variance_inflation_factor
     vif = [variance_inflation_factor(X_new.values, i) for i in range(X_new.shape[1])]
 
     # Remove features with high VIF
-    threshold = 5
+    threshold = 10  # not sure the suitable number
     res = []
     for i in vif:
         res.append(i > threshold)
@@ -227,37 +268,65 @@ def regression(df_concat):
     # Use Box-Cox transformation
     from scipy.stats import boxcox
     y_transformed, _ = boxcox(y)
-    ## Split the data into training and testing sets
-    # X_train, X_test, y_train, y_test = train_test_split(X_new, y_transformed, test_size=0.2)
-    #
-    # # Create a linear regression model
-    # model = LinearRegression()
-    # # Fit the model to the training data
-    # model.fit(X_train, y_train)
-    # # Predict the response for the testing data
-    # y_pred = model.predict(X_test)
-    #
-    # # Evaluate the model's performance
-    # mae = mean_absolute_error(y_test, y_pred)
-    # r2 = r2_score(y_test, y_pred)
-    # print(f'MAE: {mae:.2f}')
-    # print(f'R2: {r2:.2f}')
-    # # Print the model's coefficients
-    # print(f'Coefficients: {model.coef_}')
+
+    def linearRegression_process(X_new, y_transformed):
+        """
+        使用正常线性回归,输入的数据是经过降维之后的
+        :param X_new:
+        :param y_transformed:
+        :return:
+        """
+
+        ## Split the data into training and testing sets
+        X_train, X_test, y_train, y_test = train_test_split(X_new, y_transformed, test_size=0.2)
+
+        # Create a linear regression model
+        model = LinearRegression()
+        # Fit the model to the training data
+        model.fit(X_train, y_train)
+        # Predict the response for the testing data
+        y_pred = model.predict(X_test)
+
+        # Evaluate the model's performance
+        mae = mean_absolute_error(y_test, y_pred)
+        r2 = r2_score(y_test, y_pred)
+        print(f'MAE: {mae:.2f}')
+        print(f'R2: {r2:.2f}')
+        # Print the model's coefficients
+        print(f'Coefficients: {model.coef_}')
+
+    # linearRegression_process(X_new,y_transformed)
 
     import statsmodels.api as sm
-    results = sm.OLS(y, X).fit()
+    results = sm.OLS(y_transformed, X_new).fit()
     print(results.summary())
 
-    # 绘制热力图
+    # --------------- 绘制热力图 ------------------
     import seaborn as sns
     # Create a larger figure
     plt.figure(figsize=(20, 18))
-    # data = X_new.corr()
-    data = X.corr()
+    # X = df_concat[['host_response_time',  # 可以通过这样的方式对需要的数据变量进行筛选
+    #                'host_response_rate',
+    #                'host_is_superhost',
+    #                'host_has_profile_pic',
+    #                'host_identity_verified',
+    #                'sentiment']]
+    data = X
+    data['sentiment'] = y
+    data = data.corr()
     # Draw the heat map
-    sns.heatmap(data, cmap='cool', annot=True, fmt='.1f')
+    ax = sns.heatmap(data, cmap='cool', annot=True, fmt='.1f',
+                     annot_kws={"fontsize": 25})
+    cbar = ax.collections[0].colorbar
+    cbar.ax.tick_params(labelsize=20)
     # Show the plot
+    plt.title("hotpot of positive sentiment and hosts' indicators",
+              fontdict={'weight': 'normal', 'size': 30})
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
+    plt.xticks(rotation=90)
+    plt.yticks(rotation=0)
+    plt.tight_layout()
     plt.show()
     # plt.savefig("./data/hotmap.jpg",dpi=500,bbox_inches = 'tight')
 
@@ -304,11 +373,11 @@ Try different model types: If linear regression is not performing well, you can 
 """
 
 if __name__ == '__main__':
-    df_concat = pd.read_csv('./data/clean/df_concat.csv', nrows=20000) # 防止计算量过大，没有进行全量运算
+    # df_concat = pd.read_csv('./data/clean/df_concat.csv', nrows=20000) # 防止计算量过大，没有进行全量运算
+    # df_concat = pd.read_csv('./data/clean/df_concat.csv')
+    df_concat = pd.read_csv('./data/sentiment/df_positive.csv',nrows=20000)
+    # df_concat = pd.read_csv('./data/sentiment/df_negative.csv')
     df_concat = reduce_mem_usage(df_concat)
-
-    # 增加sentiment评分这一列
-    df_concat = score_sentiment_comments(df_concat)
 
     # TODO:构建特征
     # numerical_fea = list(df_concat.select_dtypes(exclude=['category']).columns)
@@ -320,10 +389,48 @@ if __name__ == '__main__':
     # TODO：将filtered_df1和filtered_df2 对下面的df进行替换就可以进行计算了
     # df = construct_dataset(df_concat) # 在这个地方进行数据集切换
     df = df_concat.select_dtypes(exclude='category')  # 这个地方对列进行选择！通过上一个todo里面的selected_cols来进行选择
+    drops = [
+        "id",
+        "scrape_id",
+        "host_id",
+        "reviewer_id",
+        "year",
+        # "month",
+        "review_scores_rating",
+        "profit_per_month",
+        "day",
+        "is_english",
+        "latitude",
+        "longitude",
+        "minimum_nights", "maximum_nights", "minimum_minimum_nights", "maximum_minimum_nights"
+        , "minimum_maximum_nights", "maximum_maximum_nights", "minimum_nights_avg_ntm", "maximum_nights_avg_ntm"
+    ]
+    df = df.drop(columns=drops)
     df = df.dropna()
 
     # 上述文本解释当中提及到的两个函数
-    rfc_process(df)
+    # rfc_process(df)
 
-    regression(df)
+    # regression(df)
     print("Success")
+
+
+    # # TODO:按照季节拆分成四个数据集
+    # # Create a new column called "quarter"
+    # df['quarter'] = (df['month'] - 1) // 3 + 1
+    #
+    # # Create four separate DataFrames for each quarter
+    # quarter_1 = df[df['quarter'] == 1]
+    # quarter_2 = df[df['quarter'] == 2]
+    # quarter_3 = df[df['quarter'] == 3]
+    # quarter_4 = df[df['quarter'] == 4]
+    #
+    # quarter = quarter_4
+    # quarter = quarter.drop(columns=["month"])
+    # # 进行随机森林rfr
+    # rfr_process(quarter)
+
+    # TODO: 对amenity进行拆分并进行分析
+    # 这是category里面嵌套的list
+    # Use the get_dummies function to split the list column into multiple columns and convert the values to 01 values
+    df = pd.concat([df_concat[['name', 'sentiment']], pd.get_dummies(df_concat['amenities'].apply(pd.Series).stack()).sum(level=0)], axis=1)
