@@ -201,6 +201,28 @@ def sentiment_clf_dt(X, y):
     sns.heatmap(cm_matrix, annot=True, fmt='d', cmap='YlGnBu')
     plt.show()
 
+def sentiment_TO_cls(reviews_details):
+    def sentiment(rating):
+        if 0.0 <= rating and rating < 0.2:
+            return 1
+        elif 0.2 <= rating and rating < 0.4:
+            return 2
+        elif 0.4 <= rating and rating < 0.6:
+            return 3
+        elif 0.6 <= rating and rating < 0.8:
+            return 4
+        elif 0.8 <= rating and rating < 1.0:
+            return 5
+        else:
+            return 0
+        # else:
+        #     return 0
+
+    # reviews_details['Sentiment_posneg'] = reviews_details['sentiment'].apply(sentiment)
+    reviews_details['sentiment'] = reviews_details['sentiment'].apply(sentiment)
+
+    return reviews_details
+
 
 if __name__ == '__main__':
     # ---------------------------------------- 1. 针对文本情感分析分类----------------------
@@ -250,16 +272,9 @@ if __name__ == '__main__':
     # df_negative = pd.read_csv("./data/sentiment/df_negative.csv")
 
     # TODO:sentiment离散化
-    def sentiment(rating):
-        if rating >= 0:
-            return 1
-        else:
-            return -1
-        # else:
-        #     return 0
 
 
-    reviews_details['Sentiment_posneg'] = reviews_details['sentiment'].apply(sentiment)
+    reviews_details = sentiment_TO_cls(reviews_details)
 
     # TODO：文本向量化+可视化
     # 先选取正向文本进行测试

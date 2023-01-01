@@ -31,6 +31,8 @@ import matplotlib.pyplot as plt
 import warnings
 import pandas as pd
 
+from demo_Text_Sentiment_Analysis import sentiment_TO_cls
+
 warnings.filterwarnings('ignore')
 
 
@@ -217,6 +219,36 @@ def rfr_process(df):
     plt.show()
 
 
+def heatmap_demo(data):
+    # --------------- 绘制热力图 ------------------
+    import seaborn as sns
+    # Create a larger figure
+    plt.figure(figsize=(20, 18))
+    # X = df_concat[['host_response_time',  # 可以通过这样的方式对需要的数据变量进行筛选
+    #                'host_response_rate',
+    #                'host_is_superhost',
+    #                'host_has_profile_pic',
+    #                'host_identity_verified',
+    #                'sentiment']]
+    # data = X
+    # data['sentiment'] = y
+    data = data.corr()
+    # Draw the heat map
+    ax = sns.heatmap(data, cmap='cool', annot=True, fmt='.3f',
+                     annot_kws={"fontsize": 12})
+    cbar = ax.collections[0].colorbar
+    cbar.ax.tick_params(labelsize=20)
+    # Show the plot
+    plt.title("Heat map of positive sentiment and amenities,Winter",
+              fontdict={'weight': 'normal', 'size': 30})
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
+    plt.xticks(rotation=90)
+    plt.yticks(rotation=0)
+    plt.tight_layout()
+    plt.show()
+    # plt.savefig("./data/hotmap.jpg",dpi=500,bbox_inches = 'tight')
+
 def regression(df_concat):
     """
     # Check the assumptions of linear regression
@@ -301,34 +333,10 @@ def regression(df_concat):
     results = sm.OLS(y_transformed, X_new).fit()
     print(results.summary())
 
-    # --------------- 绘制热力图 ------------------
-    import seaborn as sns
-    # Create a larger figure
-    plt.figure(figsize=(20, 18))
-    # X = df_concat[['host_response_time',  # 可以通过这样的方式对需要的数据变量进行筛选
-    #                'host_response_rate',
-    #                'host_is_superhost',
-    #                'host_has_profile_pic',
-    #                'host_identity_verified',
-    #                'sentiment']]
-    data = X
-    data['sentiment'] = y
-    data = data.corr()
-    # Draw the heat map
-    ax = sns.heatmap(data, cmap='cool', annot=True, fmt='.1f',
-                     annot_kws={"fontsize": 25})
-    cbar = ax.collections[0].colorbar
-    cbar.ax.tick_params(labelsize=20)
-    # Show the plot
-    plt.title("hotpot of positive sentiment and hosts' indicators",
-              fontdict={'weight': 'normal', 'size': 30})
-    plt.xticks(fontsize=20)
-    plt.yticks(fontsize=20)
-    plt.xticks(rotation=90)
-    plt.yticks(rotation=0)
-    plt.tight_layout()
-    plt.show()
-    # plt.savefig("./data/hotmap.jpg",dpi=500,bbox_inches = 'tight')
+
+    # 绘制热力图
+    X['sentiment']=y
+    heatmap_demo(X)
 
 
 # -------------------------------- 2. 使用随机森林构建权重分析 -----------------------
@@ -375,48 +383,49 @@ Try different model types: If linear regression is not performing well, you can 
 if __name__ == '__main__':
     # df_concat = pd.read_csv('./data/clean/df_concat.csv', nrows=20000) # 防止计算量过大，没有进行全量运算
     # df_concat = pd.read_csv('./data/clean/df_concat.csv')
-    df_concat = pd.read_csv('./data/sentiment/df_positive.csv',nrows=20000)
+    df_concat = pd.read_csv('./data/sentiment/df_positive.csv')
     # df_concat = pd.read_csv('./data/sentiment/df_negative.csv')
     df_concat = reduce_mem_usage(df_concat)
-
+    df = df_concat
     # TODO:构建特征
     # numerical_fea = list(df_concat.select_dtypes(exclude=['category']).columns)
     # category_fea = list(filter(lambda x: x not in numerical_fea, list(df_concat.columns)))
     # selected_cols = numerical_fea + [""]
 
-    # -------------------------------- 构建数据集 --------------------------
-    # X,y 在进入函数之后再进行拆分
-    # TODO：将filtered_df1和filtered_df2 对下面的df进行替换就可以进行计算了
-    # df = construct_dataset(df_concat) # 在这个地方进行数据集切换
-    df = df_concat.select_dtypes(exclude='category')  # 这个地方对列进行选择！通过上一个todo里面的selected_cols来进行选择
-    drops = [
-        "id",
-        "scrape_id",
-        "host_id",
-        "reviewer_id",
-        "year",
-        # "month",
-        "review_scores_rating",
-        "profit_per_month",
-        "day",
-        "is_english",
-        "latitude",
-        "longitude",
-        "minimum_nights", "maximum_nights", "minimum_minimum_nights", "maximum_minimum_nights"
-        , "minimum_maximum_nights", "maximum_maximum_nights", "minimum_nights_avg_ntm", "maximum_nights_avg_ntm"
-    ]
-    df = df.drop(columns=drops)
-    df = df.dropna()
-
-    # 上述文本解释当中提及到的两个函数
-    # rfc_process(df)
-
-    # regression(df)
-    print("Success")
+    # # -------------------------------- 构建数据集 --------------------------
+    # # X,y 在进入函数之后再进行拆分
+    # # TODO：将filtered_df1和filtered_df2 对下面的df进行替换就可以进行计算了
+    # # df = construct_dataset(df_concat) # 在这个地方进行数据集切换
+    # df = df_concat.select_dtypes(exclude='category')  # 这个地方对列进行选择！通过上一个todo里面的selected_cols来进行选择
+    # drops = [
+    #     "id",
+    #     "scrape_id",
+    #     "host_id",
+    #     "reviewer_id",
+    #     "year",
+    #     # "month",
+    #     "review_scores_rating",
+    #     "profit_per_month",
+    #     "day",
+    #     "is_english",
+    #     "latitude",
+    #     "longitude",
+    #     "minimum_nights", "maximum_nights", "minimum_minimum_nights", "maximum_minimum_nights"
+    #     , "minimum_maximum_nights", "maximum_maximum_nights", "minimum_nights_avg_ntm", "maximum_nights_avg_ntm"
+    # ]
+    # df = df.drop(columns=drops)
+    # df = df.dropna()
+    #
+    # # 上述文本解释当中提及到的两个函数
+    # # rfc_process(df)
+    #
+    # # regression(df)
+    # print("Success")
 
 
     # # TODO:按照季节拆分成四个数据集
-    # # Create a new column called "quarter"
+    # # 正常北半球：
+    # # # Create a new column called "quarter"
     # df['quarter'] = (df['month'] - 1) // 3 + 1
     #
     # # Create four separate DataFrames for each quarter
@@ -424,7 +433,13 @@ if __name__ == '__main__':
     # quarter_2 = df[df['quarter'] == 2]
     # quarter_3 = df[df['quarter'] == 3]
     # quarter_4 = df[df['quarter'] == 4]
-    #
+
+    # 澳洲南半球：
+    quarter_summer = df[(df['month'] == 1)|(df['month'] == 2)|(df['month'] == 12)]
+    quarter_autumn = df[(df['month'] == 3)|(df['month'] == 4)|(df['month'] == 5)]
+    quarter_winter = df[(df['month'] == 6)|(df['month'] == 7)|(df['month'] == 8)]
+    quarter_spring = df[(df['month'] == 9)|(df['month'] == 10)|(df['month'] == 11)]
+    df = quarter_spring
     # quarter = quarter_4
     # quarter = quarter.drop(columns=["month"])
     # # 进行随机森林rfr
@@ -433,4 +448,25 @@ if __name__ == '__main__':
     # TODO: 对amenity进行拆分并进行分析
     # 这是category里面嵌套的list
     # Use the get_dummies function to split the list column into multiple columns and convert the values to 01 values
-    df = pd.concat([df_concat[['name', 'sentiment']], pd.get_dummies(df_concat['amenities'].apply(pd.Series).stack()).sum(level=0)], axis=1)
+    from sklearn.preprocessing import MultiLabelBinarizer
+    import json
+
+    df["amenities_list"] = df["amenities"].apply(lambda x: json.loads(x))
+    # Create an instance of MultiLabelBinarizer
+    mlb = MultiLabelBinarizer()
+    # Fit the binarizer to the labels
+    amenities_list_binary=mlb.fit_transform(df["amenities_list"])
+    # X_data = pd.DataFrame(amenities_list_binary, columns=mlb.classes_, index=df.id)
+    X_data = pd.DataFrame(amenities_list_binary, columns=mlb.classes_)
+
+    df = sentiment_TO_cls(df) # 将sentiment离散化
+    df = df.reset_index()
+
+    X_data['sentiment'] = df['sentiment']
+
+
+    corr_data = X_data.corr().loc["sentiment"]
+    corr_data[corr_data>0].sort_values(ascending=False)
+    data = X_data[corr_data[corr_data > 0].sort_values(ascending=False)[:20].index]
+    heatmap_demo(data) # plot
+
