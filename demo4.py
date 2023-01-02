@@ -2,30 +2,22 @@
 # -*- coding: utf-8 -*-
 # author： Leo
 # datetime： 2022/12/23 21:14
+import pandas as pd
 
+from config import reduce_mem_usage
 
+"""
+which requires python 3.7 to intall the esential packages.
+"""
 
-# # 序列相关性分析
-# import numpy as np
-# from scipy.stats import pearsonr, spearmanr
-#
-# data1 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-# data2 = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
-# r, p = pearsonr(data1, data2)
-# print('Pearson correlation coefficient:', r)
-# print('p-value:', p)
+# # 序列分析预测
+# # predict Paul这个host的下个月profit
+# df_concat = pd.read_csv('./data/sentiment/df_positive.csv')
+# df_concat = reduce_mem_usage(df_concat)
+# df = df_concat[df_concat['host_name']=='Paul']
+# df.to_csv("./data/prediction/Paul_dataset.csv",index=False)
+# monthly_profit_of_Paul = df.groupby(['year','month'])['profit_per_month'].mean()
+# monthly_profit_of_Paul.to_csv("./data/prediction/monthly_profit_of_Paul.csv",index=False)
 
+df = pd.read_csv("./data/prediction/Paul_profit.csv")
 
-# ---------------------------- 3. 序列分析 ---------------------
-# 以host做profit_per_month 和sentiment的相关性（相关性）
-# 因此要提升sentiment的方法
-
-# 序列分析任务：序列分析一定是某一个变量按照年月组成一个一维的list。Nick的月sentiment的变化情况
-
-
-# Select the columns to analyze
-column1 = 'column1'
-column2 = 'column2'
-
-# Calculate the Pearson correlation coefficient
-correlation = df[column1].corr(df[column2])

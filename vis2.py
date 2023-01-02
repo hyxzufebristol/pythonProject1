@@ -48,7 +48,7 @@ def map_distance(df):
     # map1
 
 
-def quick_plot(df):
+def quick_plot_bar(df):
     """
     这里用了快速展示的一个输出方法
     :return:
@@ -66,7 +66,7 @@ def quick_plot(df):
 
 def review_score_bar_plot(df):
     """
-    对
+    一张图里面输出六个小图
     :return:
     """
     # review 一系列都是得分能够直接获得消费者对这家店的评价

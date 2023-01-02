@@ -220,6 +220,11 @@ def rfr_process(df):
 
 
 def heatmap_demo(data):
+    """
+    输入数据就是完整的需要进行热力图绘制的数据集
+    :param data:
+    :return:
+    """
     # --------------- 绘制热力图 ------------------
     import seaborn as sns
     # Create a larger figure
@@ -239,7 +244,7 @@ def heatmap_demo(data):
     cbar = ax.collections[0].colorbar
     cbar.ax.tick_params(labelsize=20)
     # Show the plot
-    plt.title("Heat map of positive sentiment and amenities,Winter",
+    plt.title("Heat map of positive sentiment and amenities",
               fontdict={'weight': 'normal', 'size': 30})
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)
@@ -338,6 +343,30 @@ def regression(df_concat):
     X['sentiment']=y
     heatmap_demo(X)
 
+def amenity_analysis(df):
+    # 这是category里面嵌套的list
+    # Use the get_dummies function to split the list column into multiple columns and convert the values to 01 values
+    from sklearn.preprocessing import MultiLabelBinarizer
+    import json
+
+    df["amenities_list"] = df["amenities"].apply(lambda x: json.loads(x))
+    # Create an instance of MultiLabelBinarizer
+    mlb = MultiLabelBinarizer()
+    # Fit the binarizer to the labels
+    amenities_list_binary = mlb.fit_transform(df["amenities_list"])
+    # X_data = pd.DataFrame(amenities_list_binary, columns=mlb.classes_, index=df.id)
+    X_data = pd.DataFrame(amenities_list_binary, columns=mlb.classes_)
+
+    df = sentiment_TO_cls(df)  # 将sentiment离散化
+    df = df.reset_index()
+
+    X_data['sentiment'] = df['sentiment']
+
+    corr_data = X_data.corr().loc["sentiment"]
+    corr_data[corr_data > 0].sort_values(ascending=False)
+    data = X_data[corr_data[corr_data > 0].sort_values(ascending=False)[:20].index]
+    heatmap_demo(data)  # plot
+
 
 # -------------------------------- 2. 使用随机森林构建权重分析 -----------------------
 # 这一部分内容按照所有特征列,全部需要进行转化，并且不会用到有关NLP部分的col，并将review_scores_value作为最终的分类目标
@@ -415,8 +444,8 @@ if __name__ == '__main__':
     # ]
     # df = df.drop(columns=drops)
     # df = df.dropna()
-    #
-    # # 上述文本解释当中提及到的两个函数
+    # # TODO:上述文本解释当中提及到的两个函数
+    # #
     # # rfc_process(df)
     #
     # # regression(df)
@@ -439,34 +468,18 @@ if __name__ == '__main__':
     quarter_autumn = df[(df['month'] == 3)|(df['month'] == 4)|(df['month'] == 5)]
     quarter_winter = df[(df['month'] == 6)|(df['month'] == 7)|(df['month'] == 8)]
     quarter_spring = df[(df['month'] == 9)|(df['month'] == 10)|(df['month'] == 11)]
+    # quarter_spring.to_csv("./data/seasonal/quarter_spring.csv", index=False)
+    # quarter_summer.to_csv("./data/seasonal/quarter_summer.csv", index=False)
+    # quarter_autumn.to_csv("./data/seasonal/quarter_autumn.csv", index=False)
+    # quarter_winter.to_csv("./data/seasonal/quarter_winter.csv", index=False)
     df = quarter_spring
     # quarter = quarter_4
     # quarter = quarter.drop(columns=["month"])
-    # # 进行随机森林rfr
+
+
+    # # TODO：进行随机森林rfr
     # rfr_process(quarter)
 
     # TODO: 对amenity进行拆分并进行分析
-    # 这是category里面嵌套的list
-    # Use the get_dummies function to split the list column into multiple columns and convert the values to 01 values
-    from sklearn.preprocessing import MultiLabelBinarizer
-    import json
-
-    df["amenities_list"] = df["amenities"].apply(lambda x: json.loads(x))
-    # Create an instance of MultiLabelBinarizer
-    mlb = MultiLabelBinarizer()
-    # Fit the binarizer to the labels
-    amenities_list_binary=mlb.fit_transform(df["amenities_list"])
-    # X_data = pd.DataFrame(amenities_list_binary, columns=mlb.classes_, index=df.id)
-    X_data = pd.DataFrame(amenities_list_binary, columns=mlb.classes_)
-
-    df = sentiment_TO_cls(df) # 将sentiment离散化
-    df = df.reset_index()
-
-    X_data['sentiment'] = df['sentiment']
-
-
-    corr_data = X_data.corr().loc["sentiment"]
-    corr_data[corr_data>0].sort_values(ascending=False)
-    data = X_data[corr_data[corr_data > 0].sort_values(ascending=False)[:20].index]
-    heatmap_demo(data) # plot
+    # amenity_analysis(df)
 
