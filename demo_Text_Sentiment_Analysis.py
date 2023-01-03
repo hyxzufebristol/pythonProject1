@@ -124,16 +124,32 @@ def top_words_importance_plt(texts):
 
     # ------------------------------ lda -------------------------------
     """
-    虽然LDA在较大的文本（超过50个单词左右）上表现非常好，
+    taks:
+    1. LDA with pyLDAvis for visualization
+    2. LDA can do high performance in large texts(more than 50 words)
     但在尝试对较短文本的主题进行建模时，它的性能往往会急剧下降，
     原因很明显，短文本（如推特或论坛问题的标题）可能只涉及单个主题
     
     """
-    n_topics = 3 # 指定 lda 主题数根据困惑度和一致性判断最佳主题数
-    # 要输出的每个主题的前 n_top_words 个主题词数
-    n_top_words = 30
 
     X = vectorizer.fit_transform(texts)
+
+    # ----- opt to determine the n_components ---------
+    # Define a grid of values for n_components
+    param_grid = {'n_components': [1,2, 3, 4]}
+    # Create a LatentDirichletAllocation object
+    lda = LatentDirichletAllocation()
+    # Use GridSearchCV to find the optimal value of n_components
+    model = GridSearchCV(lda, param_grid, cv=5)
+    model.fit(X)
+    # Print the optimal value of n_components
+    print(model.best_params_) # {'n_components': 1}
+
+
+    n_topics = 1 # 指定 lda 主题数根据困惑度和一致性判断最佳主题数
+    # 要输出的每个主题的前 n_top_words 个主题词数
+    n_top_words = 30
+    # use the best paramaters.
     lda = LatentDirichletAllocation(n_components=n_topics,
                                     max_iter=50,
                                     learning_method='online',
@@ -199,53 +215,50 @@ def top_words_importance_plt(texts):
 
 
     # ------------- GSDMM ------------------
-
-    # import gensim
-    # from gensim.summarization import summarize, keywords # 3.4.0
-    #
-    # # Summarize the data
-    # summary = summarize(' '.join(data), ratio=0.5)
-    #
-    # # Extract the top keywords
-    # keywords = keywords(summary, lemmatize=True, words=5)
-    # print(keywords)
+    # that is an Algorithm from paper ?
 
 
+    def wordcloud_with_topdict(features, importances):
+        """
 
-    # # --------------------------- visualization ------------------
-    # # TODO: for showing the top 100.
-    ## 这个需要重要程度权重构建
-    # # Zip the features and importance weights together
-    # keywords = zip(features, importances)
-    # # Sort the keywords by importance weight in descending order
-    # keywords = sorted(keywords, key=lambda x: x[1], reverse=True)
-    # # Print the top 100 keywords and their importance weights
-    # for keyword, importance in keywords[:100]:
-    #     print(f'{keyword}: {importance:.2f}')
-    #
-    # # TODO: Construct the wordcloud
-    # # Extract the top 100 keywords and their importance weights
-    # keywords_cloud = [(keyword, importance) for keyword, importance in zip(features, importances)][:100]
-    # keywords_cloud = dict(keywords_cloud)
-    # stopwords = set(STOPWORDS)
-    # # img = imageio.imread('./data/alice_mask.png')
-    # # Create a wordcloud object
-    # wordcloud = WordCloud(max_words=2000,
-    #                       background_color="white",  # 设置背景颜色
-    #                       width=1000, height=860,
-    #                       # mask=img,# 设置背景图片
-    #                       stopwords=stopwords
-    #                       )
-    #
-    # # Generate the wordcloud from the keywords and importance weights
-    # wordcloud.generate_from_frequencies(keywords_cloud) # 在这个地方进行文本替换即可
-    #
-    # # Plot the wordcloud
-    # plt.imshow(wordcloud, interpolation='bilinear')
-    # plt.axis("off")
-    # plt.show()
-    # # plt.savefig('tfidf_top100_wordCloud.png",dpi=500,bbox_inches = 'tight') # save the image.
-    #
+        :param features:
+        :param importances:
+        :return:
+        """
+        # --------------------------- visualization ------------------
+        # TODO: for showing the top 100.
+        # 这个需要重要程度权重构建
+        # Zip the features and importance weights together
+        keywords = zip(features, importances)
+        # Sort the keywords by importance weight in descending order
+        keywords = sorted(keywords, key=lambda x: x[1], reverse=True)
+        # Print the top 100 keywords and their importance weights
+        for keyword, importance in keywords[:100]:
+            print(f'{keyword}: {importance:.2f}')
+
+        # TODO: Construct the wordcloud
+        # Extract the top 100 keywords and their importance weights
+        keywords_cloud = [(keyword, importance) for keyword, importance in zip(features, importances)][:100]
+        keywords_cloud = dict(keywords_cloud)
+        stopwords = set(STOPWORDS)
+        # img = imageio.imread('./data/alice_mask.png')
+        # Create a wordcloud object
+        wordcloud = WordCloud(max_words=2000,
+                              background_color="white",  # 设置背景颜色
+                              width=1000, height=860,
+                              # mask=img,# 设置背景图片
+                              stopwords=stopwords
+                              )
+
+        # Generate the wordcloud from the keywords and importance weights
+        wordcloud.generate_from_frequencies(keywords_cloud) # 在这个地方进行文本替换即可
+
+        # Plot the wordcloud
+        plt.imshow(wordcloud, interpolation='bilinear')
+        plt.axis("off")
+        plt.show()
+        # plt.savefig('tfidf_top100_wordCloud.png",dpi=500,bbox_inches = 'tight') # save the image.
+
 
 
 def sentiment_clf_rfc(X, y):
@@ -373,7 +386,6 @@ def reformat_dataset():
 
 if __name__ == '__main__':
     # TODO: 构建完毕之后直接读取就行了
-    # reviews_details = pd.read_csv("./data/sentiment/reviews_details.csv")
     reviews_details = pd.read_csv("./data/seasonal/quarter_winter.csv")
     reviews_details = reduce_mem_usage(reviews_details)
 
@@ -388,10 +400,6 @@ if __name__ == '__main__':
     # # step one: output the top 100 keywords.
     # tfidf+lda+gsdmm1
     top_words_importance_plt(texts)
-
-
-
-
 
 
     # ------------------------- classification model judgement -------------------

@@ -8,15 +8,16 @@
 import pandas as pd
 import folium
 from folium.plugins import FastMarkerCluster
-import missingno as msno
+
 from matplotlib import pyplot as plt
 from config import *
 from math import asin, sin, cos, sqrt
-import missingno as msno
+
 import numpy as np
 import pandas as pd
 from config import *
 import warnings
+
 pd.set_option('display.max_rows', 100)
 pd.set_option('display.max_columns', 100)
 
@@ -37,21 +38,18 @@ def df_listings_processing(df_listings):
         "picture_url",
         "host_url",
 
-        "host_id", # 这个id好像确实是没有什么用
-        "host_location", # 区域位置，并不是经纬度
+        "host_id",  # 这个id好像确实是没有什么用
+        "host_location",  # 区域位置，并不是经纬度
         # "host_acceptance_rate",
         "neighbourhood_cleansed",  # 30类
 
         # 房间的设施
-        "amenities", # 房间包含的设施
-        "bathrooms_text", # bath的种类,30类
+        "amenities",  # 房间包含的设施
+        "bathrooms_text",  # bath的种类,30类
         'bedrooms', 'beds',
 
-
-
-
         ## 时间类变量
-        "first_review", "last_review", "calendar_last_scraped","last_scraped","host_since",
+        "first_review", "last_review", "calendar_last_scraped", "last_scraped", "host_since",
 
         # # 这两个可以用来构建关系网
         "host_neighbourhood",  #
@@ -80,12 +78,13 @@ def df_listings_processing(df_listings):
     df_listings_drop5['price_$'] = df_listings_drop5['price'].apply(format_price).astype("float32")
     df_listings_drop5['profit_per_month'] = df_listings_drop5['price_$'] * df_listings_drop5['reviews_per_month'] / \
                                             df_listings_drop5['review_scores_rating']
-    df_listings_drop5.drop(columns=['price'],inplace=True)
+    df_listings_drop5.drop(columns=['price'], inplace=True)
 
     # 处理host相关变量
     # replace 't' to '1', and 'f' to '0' in the columns of 'host_is_superhost','host_has_profile_pic','host_identity_verified','instant_bookable'
     # Convert 't', 'f' to 1, 0
-    tf_cols = ['host_is_superhost', 'host_has_profile_pic', 'host_identity_verified', 'instant_bookable', 'has_availability']
+    tf_cols = ['host_is_superhost', 'host_has_profile_pic', 'host_identity_verified', 'instant_bookable',
+               'has_availability']
     for tf_col in tf_cols:
         df_listings_drop5[tf_col] = df_listings_drop5[tf_col].map({'t': 1, 'f': 0}).astype("int64")
 
@@ -119,7 +118,7 @@ def df_listings_processing(df_listings):
         (
                 ((df_listings['latitude'] + 37.82) / 2).apply(sin) ** 2 +
                 (df_listings['latitude']).apply(cos) * (df_listings['latitude']).apply(cos) * (
-                            ((df_listings['longitude'] - 144.96) / 2).apply(sin) ** 2)
+                        ((df_listings['longitude'] - 144.96) / 2).apply(sin) ** 2)
         ).apply(sqrt)
     ).apply(asin)
 
@@ -149,28 +148,46 @@ def df_review_processing(df_reviews):
     return df_reviews
 
 
-if __name__ == '__main__':
-    # zero step
-    # df_listings = pd.read_csv('./data/raw/listings.csv')
-    df_listings = pd.read_csv('./data/raw/listings.csv', nrows=10000)
-    df_listings = reduce_mem_usage(df_listings)
-    # df_reviews = pd.read_csv('./data/raw/reviews.csv')
-    df_reviews = pd.read_csv('./data/raw/reviews.csv', nrows=10000)
-    df_reviews = reduce_mem_usage(df_reviews)
-
-    # # 缺失值可视化
-    # msno.matrix(df_listings, labels=True)
-    # # 热力图可视化
-    # msno.heatmap(df_listings)
-    # # 树状图可视化
-    # msno.dendrogram(df_listings)
-
-    # -------------------- 对处理完毕的数据进行合并合并dataframe -------------
-    # 这部分内容是完成了listing 和reviews两个数据集的合并，并将其保存到了df_concat.csv 文件当中
-    df_listings = df_listings_processing(df_listings)
-    df_reviews = df_review_processing(df_reviews)
-    df_concat = pd.merge(df_listings, df_reviews, how="inner", on='id')
-
+def df_concat(df1, df2):
+    """
+    数据集的拼接方式
+    1. 实现按照某一列进行拼接，以df1为基准
+    :param df1:
+    :param df2:
+    :return:
+    """
+    df_concat = pd.merge(df1, df2, how="inner", on='id')
     df_concat.to_csv("./data/clean/df_concat.csv", index=False)
     # df_listings.to_csv("./data/clean/df_listings.csv", index=False)
     print("Processing success!")
+
+
+def visualization(df_listings):
+    """
+    数据描述
+    :param df_listings:
+    :return:
+    """
+    data = pd.read_csv('./data/raw/listings.csv', nrows=10000)
+    df_listings = data
+    import missingno as msno
+    # 缺失值可视化
+    msno.matrix(df_listings, labels=True)
+    # 热力图可视化
+    msno.heatmap(df_listings)
+    # 树状图可视化
+    msno.dendrogram(df_listings)
+
+if __name__ == '__main__':
+
+    df_listings = pd.read_csv('./data/raw/listings.csv')
+    df_listings = reduce_mem_usage(df_listings)
+    df_reviews = pd.read_csv('./data/raw/reviews.csv')
+    df_reviews = reduce_mem_usage(df_reviews)
+
+    # 数据清洗
+    df_listings = df_listings_processing(df_listings)
+    df_reviews = df_review_processing(df_reviews)
+
+
+    df_concat(df_listings, df_reviews)
