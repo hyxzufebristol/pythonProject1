@@ -99,6 +99,10 @@ def top_words_importance_plt(texts):
     2. 输出top 100 的关键词 以及 对应的词云(如果要改变词云形状需要自定义图片和输入路径)
     3. LDA模型
     4. GSDMM模型
+    ref
+    https://towardsdatascience.com/short-text-topic-modelling-lda-vs-gsdmm-20f1db742e14
+    https://zhuanlan.zhihu.com/p/446757039
+    https://blog.csdn.net/qq_39496504/article/details/107125284
     :param texts:
     :return:
     """
@@ -129,21 +133,20 @@ def top_words_importance_plt(texts):
     2. LDA can do high performance in large texts(more than 50 words)
     但在尝试对较短文本的主题进行建模时，它的性能往往会急剧下降，
     原因很明显，短文本（如推特或论坛问题的标题）可能只涉及单个主题
-    
     """
 
     X = vectorizer.fit_transform(texts)
 
-    # ----- opt to determine the n_components ---------
-    # Define a grid of values for n_components
-    param_grid = {'n_components': [1,2, 3, 4]}
-    # Create a LatentDirichletAllocation object
-    lda = LatentDirichletAllocation()
-    # Use GridSearchCV to find the optimal value of n_components
-    model = GridSearchCV(lda, param_grid, cv=5)
-    model.fit(X)
-    # Print the optimal value of n_components
-    print(model.best_params_) # {'n_components': 1}
+    # # ----- opt to determine the n_components ---------
+    # # Define a grid of values for n_components
+    # param_grid = {'n_components': [1, 2, 3, 4]}
+    # # Create a LatentDirichletAllocation object
+    # lda = LatentDirichletAllocation()
+    # # Use GridSearchCV to find the optimal value of n_components
+    # model = GridSearchCV(lda, param_grid, cv=5)
+    # model.fit(X)
+    # # Print the optimal value of n_components
+    # print(model.best_params_) # {'n_components': 1}
 
 
     n_topics = 1 # 指定 lda 主题数根据困惑度和一致性判断最佳主题数
@@ -162,13 +165,11 @@ def top_words_importance_plt(texts):
     # TODO:visualization 2
     # Get the topic-word distributions from the LDA model
     topic_word = lda.components_
-
     # Get the top 100 key words for each topic
     key_words = []
     for topic in topic_word:
         word_idx = np.argsort(topic)[::-1][:100]
         key_words.append([features[i] for i in word_idx])
-
     # Concatenate the key words into a single list
     key_words = [word for topic in key_words for word in topic]
 
@@ -215,12 +216,11 @@ def top_words_importance_plt(texts):
 
 
     # ------------- GSDMM ------------------
-    # that is an Algorithm from paper ?
+    # that is an Algorithm from paper.
 
 
     def wordcloud_with_topdict(features, importances):
         """
-
         :param features:
         :param importances:
         :return:
@@ -241,12 +241,12 @@ def top_words_importance_plt(texts):
         keywords_cloud = [(keyword, importance) for keyword, importance in zip(features, importances)][:100]
         keywords_cloud = dict(keywords_cloud)
         stopwords = set(STOPWORDS)
-        # img = imageio.imread('./data/alice_mask.png')
+        img = imageio.imread('./data/airbnb_wordcloud1.png')
         # Create a wordcloud object
         wordcloud = WordCloud(max_words=2000,
                               background_color="white",  # 设置背景颜色
                               width=1000, height=860,
-                              # mask=img,# 设置背景图片
+                              mask=img,# 设置背景图片
                               stopwords=stopwords
                               )
 
@@ -259,6 +259,7 @@ def top_words_importance_plt(texts):
         plt.show()
         # plt.savefig('tfidf_top100_wordCloud.png",dpi=500,bbox_inches = 'tight') # save the image.
 
+    # wordcloud_with_topdict(features, importances)
 
 
 def sentiment_clf_rfc(X, y):
@@ -386,7 +387,7 @@ def reformat_dataset():
 
 if __name__ == '__main__':
     # TODO: 构建完毕之后直接读取就行了
-    reviews_details = pd.read_csv("./data/seasonal/quarter_winter.csv")
+    reviews_details = pd.read_csv("./data/seasonal/quarter_spring.csv")
     reviews_details = reduce_mem_usage(reviews_details)
 
     # TODO:sentiment离散化
